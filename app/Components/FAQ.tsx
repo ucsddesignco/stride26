@@ -38,9 +38,8 @@ export default function FAQ() {
   };
 
   return (
-    <section id="faq" className="w-full pb-30">
-      {/* Centered container with max-width and your 120px (px-30) padding */}
-      <div className="max-w-7xl mx-auto px-30">
+    <section id="faq" className="w-full pb-16 lg:pb-30">
+      <div className="max-w-7xl mx-auto px-6 md:px-16 lg:px-30">
         <h2 className="text-3xl font-display text-black pb-6">
           FAQ
         </h2>

@@ -12,6 +12,11 @@
   --font-display: var(--font-neue-plak), sans-serif;
 }
 
+@theme {
+  --breakpoint-md: 744px;
+  --breakpoint-lg: 1280px;
+}
+
 /* @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;

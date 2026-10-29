@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, Menu } from "lucide-react";
 import FAQ from "./Components/FAQ";
 import ArrowIcon from "./Components/ArrowIcon";
 
@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-white">
       {/* nav */}
-      <nav className="sticky top-0 z-50 flex items-center justify-between px-8 py-4 bg-white/80 backdrop-blur-md border-b border-gray-100">
+      <nav className="sticky top-0 z-50 flex items-center justify-between px-6 md:px-8 py-4 bg-white/80 backdrop-blur-md border-b border-gray-100">
         <div className="flex items-center gap-2">
           <ArrowIcon></ArrowIcon>
           <span className="font-display">DESIGN CO</span>
@@ -25,6 +25,7 @@ export default function Home() {
             Contact
           </a>
         </div>
+        <Menu className="md:hidden" />
       </nav>
 
       {/* hero */}
@@ -33,11 +34,11 @@ export default function Home() {
       </section>
 
       {/* intro */}
-      <section className="py-30 max-w-7xl mx-auto px-30">
+      <section className="py-16 lg:py-30 max-w-7xl mx-auto px-6 md:px-16 lg:px-30">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-          <div>
+          <div className="order-2 lg:order-1">
             <div>
-              <div className="w-full h-[320px] bg-gray-100 rounded-md flex items-center justify-center"></div>
+              <div className="w-full h-[320px] md:h-[444px] lg:h-[320px] bg-gray-100 rounded-md"></div>
             </div>
             <div className="py-4 flex w-full justify-center gap-[8px]">
               <div className="h-[8px] w-[8px] bg-gray-600 flex rounded-full"></div>
@@ -46,7 +47,7 @@ export default function Home() {
               <div className="h-[8px] w-[8px] bg-gray-300 flex rounded-full"></div>
             </div>
           </div>
-          <div className="space-y-6">
+          <div className="order-1 lg:order-2 space-y-6">
             <h2 className="text-3xl font-display text-gray-900">
               STRIDE is Design Co’s uniquely design-forward career fair.
             </h2>
@@ -67,7 +68,7 @@ export default function Home() {
       {/* agenda */}
       <section
         id="agenda"
-        className="pb-30 px-30 max-w-7xl mx-auto bg-gray-50/50 rounded-3xl my-12"
+        className="pb-16 lg:pb-30 px-6 md:px-16 lg:px-30 max-w-7xl mx-auto bg-gray-50/50 rounded-3xl my-12"
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div className="space-y-6">
@@ -93,16 +94,16 @@ export default function Home() {
               <p className="text-2xl">Doors Close</p>
             </div>
           </div>
-          <div className="w-full h-full bg-gray-100 rounded-md"></div>
+          <div className="hidden lg:block w-full h-full bg-gray-100 rounded-md"></div>
         </div>
       </section>
 
       {/* judges */}
-      <section className="pb-30 px-30 max-w-7xl mx-auto bg-gray-50/50 rounded-3xl my-12">
+      <section className="pb-16 lg:pb-30 px-6 md:px-16 lg:px-30 max-w-7xl mx-auto bg-gray-50/50 rounded-3xl my-12">
         <div className="flex flex-col gap-5">
           <h2 className="text-3xl font-display text-gray-900">(Judges)</h2>
           <div className="flex w-full gap-6 justify-center items-center">
-            <ChevronLeft></ChevronLeft>
+            <ChevronLeft className="hidden lg:block" />
             <div className="flex w-full justify-between gap-8">
               <div className="w-full flex flex-col gap-4">
                 <div className="bg-gray-200 w-full h-[220px] rounded-md font-sans"></div>
@@ -114,18 +115,18 @@ export default function Home() {
                 <p className="text-lg font-sans leading-1">First Last</p>
                 <p className="font-sans leading-1 text-sm">Role @ Company</p>
               </div>
-              <div className="w-full flex flex-col gap-4">
+              <div className="hidden md:flex w-full flex-col gap-4">
                 <div className="bg-gray-200 w-full h-[220px] rounded-md font-sans"></div>
                 <p className="text-lg font-sans leading-1">First Last</p>
                 <p className="font-sans leading-1 text-sm">Role @ Company</p>
               </div>
-              <div className="w-full flex flex-col gap-4">
+              <div className="hidden lg:flex w-full flex-col gap-4">
                 <div className="bg-gray-200 w-full h-[220px] rounded-md font-sans"></div>
                 <p className="text-lg font-sans leading-1">First Last</p>
                 <p className="font-sans leading-1 text-sm">Role @ Company</p>
               </div>
             </div>
-            <ChevronRight></ChevronRight>
+            <ChevronRight className="hidden lg:block" />
           </div>
         </div>
       </section>
@@ -147,7 +148,7 @@ export default function Home() {
 
       {/* footer */}
       <section>
-        <div className="px-30 py-8 font-sans flex justify-between text-sm">
+        <div className="px-6 md:px-16 lg:px-30 py-8 font-sans flex justify-between text-sm">
           <p>Made with {`<`}3 by Design Co</p>
           <p>Fall 2026</p>
         </div>
