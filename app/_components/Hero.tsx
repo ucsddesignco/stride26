@@ -1,11 +1,14 @@
 import Image from "next/image";
 import HeroIntro from "./HeroIntro";
+import PoolShot from "./PoolShot";
 import TableScene from "./TableScene";
 
 // The hero has three fixed-size stages (desktop 1280, tablet 744, mobile 390),
 // each centered and swapped at a breakpoint. Only the pool table scene moves
 // continuously with width, desktop → tablet → mobile (see TableScene).
 // HeroIntro plays the entrance: glowing title, table light flicker, cue slide.
+// Then PoolShot lets you take the shot; the stages above the table pass
+// pointer events through to it, except on their links.
 
 // Star decorations. `inset` is the star's offset within its square bounding box.
 const STAR_INSET_LG = "inset-[8.23%_8.82%_10.56%_8.82%]";
@@ -152,12 +155,14 @@ export default function Hero() {
       <HeroIntro>
         {/* table light (flickers on) */}
         <div data-hero-light className="absolute inset-0 opacity-[0.08] brightness-30">
-          <TableScene />
+          <PoolShot>
+            <TableScene />
+          </PoolShot>
         </div>
 
         {/* desktop */}
-        <div className="absolute left-1/2 top-0 hidden h-full w-[1280px] -translate-x-1/2 lg:block">
-          <div data-hero-text className="absolute left-[110px] top-[115px] w-[621px] opacity-0">
+        <div className="absolute left-1/2 top-0 hidden h-full w-[1280px] -translate-x-1/2 pointer-events-none lg:block">
+          <div data-hero-text className="absolute left-[110px] top-[115px] w-[621px] opacity-0 [&_a]:pointer-events-auto">
             <Wordmark className="text-[142.907px] [text-shadow:0_0_15.5px_rgba(255,255,255,0.65)]" />
             <DesktopEventDetails />
           </div>
@@ -165,8 +170,8 @@ export default function Hero() {
         </div>
 
         {/* tablet */}
-        <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 sm:block lg:hidden">
-          <div data-hero-text className="absolute left-[75px] top-[42.34px] opacity-0">
+        <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 pointer-events-none sm:block lg:hidden">
+          <div data-hero-text className="absolute left-[75px] top-[42.34px] opacity-0 [&_a]:pointer-events-auto">
             <Wordmark className="text-[138.93px]" />
             <EventDetails date={"Wednesday, November 18  |  6:30-9:00 PM"} iconClassName="opacity-80" />
           </div>
@@ -174,8 +179,8 @@ export default function Hero() {
         </div>
 
         {/* mobile */}
-        <div className="absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 sm:hidden">
-          <div data-hero-text className="absolute left-[36px] top-[275px] flex flex-col gap-[2px] opacity-0">
+        <div className="absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 pointer-events-none sm:hidden">
+          <div data-hero-text className="absolute left-[36px] top-[275px] flex flex-col gap-[2px] opacity-0 [&_a]:pointer-events-auto">
             <Wordmark className="text-[95.5px]" />
             <EventDetails date={"Wed, November 18  |  6:30-9:00 PM"} />
           </div>

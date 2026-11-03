@@ -3,14 +3,14 @@ import type { CSSProperties } from "react";
 // The pool table is modelled as a small 3D scene seen by an orthographic
 // camera. The camera's elevation is driven purely by viewport width in CSS
 // (see `.table-scene` in globals.css), so this stays a zero-JS server component.
-// HeroIntro slides the cue in by setting `--slide` on the scene.
+// HeroIntro and PoolShot animate it by setting CSS variables on its parts.
 //
 // World coordinates are in tablet-frame px (Figma 9026:1895), origin at the
 // table center: x → right, z → toward the viewer, height h → up.
 // A point (x, z, h) lands on screen at (x, z·s − h·c), where s/c are the
 // sine/cosine of the camera elevation.
 
-const TABLE_RADIUS = 508.48;
+export const TABLE_RADIUS = 508.48;
 
 type Ball = {
   kind: "yellow" | "blue" | "white" | "eight";
@@ -66,7 +66,7 @@ const balls: Ball[] = [
   },
 ];
 
-const cueBall = balls.find((b) => b.kind === "white")!;
+export const cueBall = balls.find((b) => b.kind === "white")!;
 
 function ballVars(ball: Ball) {
   const [sa, sb, sc, sd] = ball.shadow.m;
@@ -152,7 +152,7 @@ function CueArt() {
 
 export default function TableScene() {
   return (
-    <div aria-hidden className="table-scene">
+    <div className="table-scene">
       <svg viewBox="-620 -640 1240 1280" width={1240} height={1280}>
         <defs>
           <clipPath id="table-felt">
@@ -165,13 +165,14 @@ export default function TableScene() {
 
         {/* spotlight cone: screen-space, lands on the table's left/right edges */}
         <polygon
+          aria-hidden
           className="table-cone"
           points={`-50.5,-615.4 72.5,-615.4 ${TABLE_RADIUS},0 ${-TABLE_RADIUS},0`}
           fill="#FFDB9F"
         />
 
         {/* everything lying on the felt, drawn top-down and squashed by the camera */}
-        <g className="table-plane">
+        <g aria-hidden className="table-plane">
           <circle r={TABLE_RADIUS} fill="#D32525" />
           <g clipPath="url(#table-felt)" fill="#660000">
             {/* unit band like the cue, tapered at the tip end and placed by the light (see globals.css);
@@ -180,7 +181,13 @@ export default function TableScene() {
               <polygon points="0.0008,0.0947 1,-0.5 2,-0.5 2,0.4375 1,0.4375 0,0.5" />
             </g>
             {balls.map((ball) => (
-              <circle key={ball.kind} className="table-ball-shadow" style={ballVars(ball)} r="1" />
+              <circle
+                key={ball.kind}
+                data-cue-ball-shadow={ball === cueBall || undefined}
+                className="table-ball-shadow"
+                style={ballVars(ball)}
+                r="1"
+              />
             ))}
           </g>
         </g>
@@ -189,16 +196,27 @@ export default function TableScene() {
         {balls.map((ball) => (
           <g key={ball.kind}>
             {ball === cueBall && (
-              <g data-hero-cue className="table-cue opacity-0" style={cueVars}>
+              <g
+                data-hero-cue
+                data-pool-cue
+                role="button"
+                tabIndex={0}
+                aria-label="Take the shot"
+                className="table-cue cursor-pointer opacity-0"
+                style={cueVars}
+              >
                 <CueArt />
               </g>
             )}
             <g
+              aria-hidden
               data-cue-ball={ball === cueBall || undefined}
-              className="table-ball"
+              className={`table-ball ${ball === cueBall ? "cursor-pointer" : ""}`}
               style={ballVars(ball)}
             >
-              <BallArt kind={ball.kind} />
+              <g className="table-ball-spin">
+                <BallArt kind={ball.kind} />
+              </g>
             </g>
           </g>
         ))}

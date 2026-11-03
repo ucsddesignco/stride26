@@ -12,7 +12,8 @@ import {
 // Intro timeline for the hero stage, replayed each time it scrolls into view:
 // the title fades in with a neon glow, the table light flickers on (as the glow
 // fades), then the cue slides in. Targets are marked in Hero and TableScene
-// with data-hero-text / -glow-title / -glow-dot / -light / -cue.
+// with data-hero-text / -glow-title / -glow-dot / -light / -cue. Once the cue
+// is in, the stage gets data-hero-ready so PoolShot can take the shot.
 
 // Flicker sequence as [duration in ms, light level]. Level 0 is "off".
 // Dark gaps shrink (260 → 160 → 90 → 50) before the light catches for good.
@@ -122,7 +123,11 @@ export default function HeroIntro({ children }: { children: ReactNode }) {
         track(animate(el, { textShadow: rest }, options));
       });
 
+    const stage = scope.current;
+    const setReady = (ready: boolean) => stage.toggleAttribute("data-hero-ready", ready);
+
     if (!inView) {
+      setReady(false);
       animate("[data-hero-light]", OFF, { duration: 0 });
       animate("[data-hero-text]", { opacity: 0 }, { duration: 0 });
       animate("[data-hero-cue]", { opacity: 0 }, { duration: 0 });
@@ -132,6 +137,7 @@ export default function HeroIntro({ children }: { children: ReactNode }) {
       animate("[data-hero-light]", ON, { duration: 0 });
       setSlide(0);
       animate("[data-hero-cue]", { opacity: 1 }, { duration: 0 });
+      setReady(true);
       track(animate("[data-hero-text]", { opacity: 1 }, { duration: 0.3 }));
     } else {
       (async () => {
@@ -173,10 +179,11 @@ export default function HeroIntro({ children }: { children: ReactNode }) {
         const transition = { delay: CUE_PAUSE, duration: CUE_SLIDE, ease: CUE_EASE };
         const offscreen = dx / (pxPerRadius * CUE_SCREEN_PER_SLIDE);
         setSlide(offscreen);
-        track(animateValue(offscreen, 0, { ...transition, onUpdate: setSlide }));
         // Explicit start keyframes: the cue stays hidden through the delay,
         // then appears off-screen and slides to rest.
         track(animate("[data-hero-cue]", { opacity: [1, 1] }, transition));
+        await track(animateValue(offscreen, 0, { ...transition, onUpdate: setSlide }));
+        if (!cancelled) setReady(true);
       })();
     }
 
@@ -187,7 +194,7 @@ export default function HeroIntro({ children }: { children: ReactNode }) {
   }, [inView, reduce, animate, scope]);
 
   return (
-    <div ref={scope} className="absolute inset-0">
+    <div ref={scope} data-hero-intro className="absolute inset-0">
       {children}
     </div>
   );
