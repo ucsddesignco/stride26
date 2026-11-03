@@ -62,10 +62,11 @@ function Stars({ stars }: { stars: Star[] }) {
 }
 
 // "Stride" with the dot over the i. Sized by font-size (--wordmark-size, blended
-// with width in globals.css); the dot is in em so it follows.
+// with width in globals.css); the dot is in em so it follows. The text-shadow is
+// its resting glow at every size; HeroIntro brightens it and settles back to it.
 function Wordmark({ className = "" }: { className?: string }) {
   return (
-    <h1 data-hero-glow-title className={`hero-wordmark relative whitespace-nowrap font-display leading-[1.4756] text-cream ${className}`}>
+    <h1 data-hero-glow-title className={`hero-wordmark relative whitespace-nowrap font-display leading-[1.4756] text-cream [text-shadow:0_0_15.5px_rgba(255,255,255,0.65)] ${className}`}>
       Stride
       <Image
         src="/hero/stride-dot.svg"
@@ -193,7 +194,7 @@ export default function Hero() {
           data-hero-text
           className="pointer-events-none hero-text absolute z-10 hidden w-[621px] opacity-0 lg:block [&_a]:pointer-events-auto"
         >
-          <Wordmark className="[text-shadow:0_0_15.5px_rgba(255,255,255,0.65)]" />
+          <Wordmark />
           <DesktopEventDetails />
         </div>
 
