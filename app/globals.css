@@ -14,13 +14,6 @@
   --font-plak: var(--font-neue-plak-regular), sans-serif;
 }
 
-/* @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-} */
-
 body {
   background: var(--background);
   color: var(--foreground);
@@ -179,7 +172,7 @@ body {
    0.32 radii above its center: horizontal heading -10.14° off the x axis,
    butt raised 5.1°. Unit direction tip → butt is (0.98049, -0.17532, 0.08889);
    it's 792.2 long and its tip sits 2.42 radii out (desktop frame 9026:1631).
-   --slide (set from JS on .table-scene, in ball radii) pulls it back along
+   --slide (set from JS on the cue and its shadow, in ball radii) pulls it back along
    that axis for the intro and the shot. */
 .table-cue,
 .table-cue-shadow {
