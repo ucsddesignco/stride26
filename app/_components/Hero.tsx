@@ -153,11 +153,13 @@ export default function Hero() {
   return (
     <section className="relative h-[760px] w-full overflow-clip bg-black">
       <HeroIntro>
-        {/* table light (flickers on) */}
-        <div data-hero-light className="absolute inset-0 opacity-[0.08] brightness-30">
+        {/* table light (flickers on). The black overlay dims the scene like
+            brightness() would, but animates on the compositor (see HeroIntro). */}
+        <div data-hero-light className="absolute inset-0 opacity-[0.08]">
           <PoolShot>
             <TableScene />
           </PoolShot>
+          <div data-hero-dim aria-hidden className="pointer-events-none absolute inset-0 bg-black opacity-70" />
         </div>
 
         {/* desktop */}
