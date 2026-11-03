@@ -1,15 +1,15 @@
 "use client";
 
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import {
   animate as animateValue,
   useAnimate,
-  useInView,
   useReducedMotion,
   type AnimationPlaybackControls,
 } from "framer-motion";
 
-// Intro timeline for the hero stage, replayed each time it scrolls into view:
+// Intro timeline for the hero stage, replayed each time it comes back after
+// fully leaving the viewport:
 // the title fades in with a neon glow, the table light flickers on (as the glow
 // fades), then the cue slides in. Targets are marked in Hero and TableScene
 // with data-hero-text / -glow-title / -glow-dot / -light / -dim / -cue. Once the cue
@@ -45,6 +45,12 @@ const ON = { light: 1, dim: 0 };
 // 0.98 of a radius per unit, so this many px of slide clear the viewport.
 const CUE_SCREEN_PER_SLIDE = 0.98049;
 const CUE_OFFSCREEN_MARGIN = 40;
+
+// The intro starts once this share of the hero is visible, but only resets
+// once none of it is. Between the two it holds, so the hero never blanks
+// while any of it is still on screen and scrolling near the edge can't
+// retrigger it. Ratios are of the hero itself, so this holds at every size.
+const START_AMOUNT = 0.3;
 
 const TITLE_PAUSE = 1; // s between title and flicker
 const CUE_PAUSE = 0.5; // s between flicker and cue
@@ -101,9 +107,26 @@ const GLOW_FADE = KEYFRAMES.duration; // fades out alongside the flicker
 
 export default function HeroIntro({ children }: { children: ReactNode }) {
   const [scope, animate] = useAnimate<HTMLDivElement>();
-  const inView = useInView(scope, { amount: 0.3 });
+  const [inView, setInView] = useState(false);
   const reduce = useReducedMotion();
   const titleRest = useRef(new Map<HTMLElement, string>());
+
+  // One observer, firing only when the ratio crosses 0 or START_AMOUNT (no
+  // scroll listeners). Same-value sets don't re-render.
+  useEffect(() => {
+    const el = scope.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        // the reported ratio can land just under the threshold it crossed
+        if (entry.isIntersecting && entry.intersectionRatio >= START_AMOUNT - 0.01) setInView(true);
+        else if (!entry.isIntersecting) setInView(false);
+      },
+      { threshold: [0, START_AMOUNT] },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [scope]);
 
   useEffect(() => {
     if (!scope.current) return;
