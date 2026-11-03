@@ -20,18 +20,58 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* ─── Hero pool table (see app/_components/TableScene.tsx) ───────────────────
-   From the desktop breakpoint (1024px) down to the tablet frame (744px) the
-   table slides from its desktop pose to its tablet pose; --u runs 1 → 0 across
-   that range. Below that the camera tilts from the tablet angle (≥744px) to
-   straight top-down (≤390px); --t runs 0 → 1 across that range. Everything
-   below is derived from them, so the scene moves continuously with no JS. */
-.table-scene {
+/* ─── Hero blend factors (set on the hero <section>, see Hero.tsx) ──────────
+   From the desktop breakpoint (1024px) down to the tablet frame (744px), --u
+   runs 1 → 0; below that, down to the mobile frame (390px), --t runs 0 → 1.
+   The pool table and the hero text interpolate between their frames on these,
+   so they move continuously with width and no JS. */
+.hero-fluid {
   /* viewport width as a plain number (length ÷ length via atan2) */
   --viewport: tan(atan2(100vw, 1px));
   --t: clamp(0, (744 - var(--viewport)) / 354, 1);
   --u: clamp(0, (var(--viewport) - 744) / 280, 1);
+  /* lets the mobile wordmark fit the section's real width (cqw), scrollbar-safe */
+  container-type: inline-size;
+}
 
+/* Hero text (see Hero.tsx): keyframes desktop left 110 / top 115 (≥1024px),
+   tablet 75 / 124 (744px), mobile centered with 44px sides and its middle at
+   310 (≤390px), linear in --u / --t. Centering blends in through left plus
+   translate(−50%·t): translate % is of the block's own size, so no width is
+   needed.
+   Wordmark size (one variable for all three stages, so it stays continuous
+   where they swap at 640 and 1024): 142.907 (≥1024) → 138.93 (744) on --u,
+   then toward the mobile fit at 640 (168.34); below 640 it fills the block's
+   span, --pad to 44px from the right edge. --wordmark-em is "Stride"'s advance
+   width in Neue Plak Extended Bold, kerning included (measured in Chrome:
+   3149px at 1000px). */
+.hero-text {
+  --pad: calc(75px + 35px * var(--u) - 31px * var(--t)); /* 110 → 75 → 44 */
+  --wordmark-em: 3.149;
+  /* 3.4038 = 354 / 104: the 744 → 640 ramp, in --t so the stepped fallback works */
+  --wordmark-size: calc(
+    138.93px + 3.977px * var(--u) + 29.41px * clamp(0, var(--t) * 3.4038, 1)
+  );
+  left: calc(var(--pad) + var(--t) * 0.5 * (100% - var(--pad) - 44px));
+  top: calc(124px - 9px * var(--u) + 186px * var(--t)); /* 115 → 124 → 310 */
+  translate: calc(var(--t) * -50%) calc(var(--t) * -50%);
+}
+
+@media (width < 40rem) {
+  .hero-text {
+    --wordmark-size: calc((100cqw - var(--pad) - 44px) / var(--wordmark-em));
+  }
+}
+
+.hero-wordmark {
+  font-size: var(--wordmark-size);
+}
+
+/* ─── Hero pool table (see app/_components/TableScene.tsx) ───────────────────
+   Across --u the table slides from its desktop pose to its tablet pose; across
+   --t the camera tilts from the tablet angle to straight top-down. Everything
+   below is derived from them. */
+.table-scene {
   /* camera elevation, linear in angle: asin(0.2288) (tablet table squash) → 90° */
   --elevation: calc(13.227deg + 76.773deg * var(--t));
   --s: sin(var(--elevation)); /* how much the felt is squashed vertically */
@@ -51,49 +91,49 @@ body {
   top: calc(615.69px - 236.69px * var(--t) + 9.89px * var(--u));
 }
 
-/* Browsers without length division: step through the slide and tilt instead */
+/* Browsers without length division: step through the blend instead */
 @supports not (width: calc(tan(atan2(1px, 1px)) * 1px)) {
-  .table-scene {
+  .hero-fluid {
     --t: 0;
     --u: 0;
   }
   @media (width >= 814px) {
-    .table-scene {
+    .hero-fluid {
       --u: 0.25;
     }
   }
   @media (width >= 884px) {
-    .table-scene {
+    .hero-fluid {
       --u: 0.5;
     }
   }
   @media (width >= 954px) {
-    .table-scene {
+    .hero-fluid {
       --u: 0.75;
     }
   }
   @media (width >= 64rem) {
-    .table-scene {
+    .hero-fluid {
       --u: 1;
     }
   }
   @media (width < 656px) {
-    .table-scene {
+    .hero-fluid {
       --t: 0.25;
     }
   }
   @media (width < 567px) {
-    .table-scene {
+    .hero-fluid {
       --t: 0.5;
     }
   }
   @media (width < 479px) {
-    .table-scene {
+    .hero-fluid {
       --t: 0.75;
     }
   }
   @media (width <= 390px) {
-    .table-scene {
+    .hero-fluid {
       --t: 1;
     }
   }

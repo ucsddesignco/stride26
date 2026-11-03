@@ -61,10 +61,11 @@ function Stars({ stars }: { stars: Star[] }) {
   ));
 }
 
-// "Stride" with the dot over the i. Sized by font-size so it scales per stage.
-function Wordmark({ className }: { className: string }) {
+// "Stride" with the dot over the i. Sized by font-size (--wordmark-size, blended
+// with width in globals.css); the dot is in em so it follows.
+function Wordmark({ className = "" }: { className?: string }) {
   return (
-    <h1 data-hero-glow-title className={`relative whitespace-nowrap font-display leading-[1.4756] text-cream ${className}`}>
+    <h1 data-hero-glow-title className={`hero-wordmark relative whitespace-nowrap font-display leading-[1.4756] text-cream ${className}`}>
       Stride
       <Image
         src="/hero/stride-dot.svg"
@@ -79,9 +80,17 @@ function Wordmark({ className }: { className: string }) {
   );
 }
 
-function EventDetails({ date, iconClassName = "" }: { date: string; iconClassName?: string }) {
+function EventDetails({
+  date,
+  iconClassName = "",
+  className = "",
+}: {
+  date: string;
+  iconClassName?: string;
+  className?: string;
+}) {
   return (
-    <div className="flex flex-col gap-[9px] font-sans text-[16px] leading-none text-white">
+    <div className={`flex flex-col gap-[9px] font-sans text-[16px] leading-none text-white ${className}`}>
       <p className="flex items-center gap-[8px]">
         <span className="whitespace-pre underline">{date}</span>
         <CalendarIcon className={iconClassName} />
@@ -151,7 +160,7 @@ function DesktopEventDetails() {
 
 export default function Hero() {
   return (
-    <section className="relative h-[760px] w-full overflow-clip bg-black">
+    <section className="hero-fluid relative h-[760px] w-full overflow-clip bg-black">
       <HeroIntro>
         {/* table light (flickers on). The black overlay dims the scene like
             brightness() would, but animates on the compositor (see HeroIntro). */}
@@ -162,31 +171,48 @@ export default function Hero() {
           <div data-hero-dim aria-hidden className="pointer-events-none absolute inset-0 bg-black opacity-70" />
         </div>
 
-        {/* desktop */}
+        {/* star stages: fixed-size frames centered per breakpoint */}
         <div className="absolute left-1/2 top-0 hidden h-full w-[1280px] -translate-x-1/2 pointer-events-none lg:block">
-          <div data-hero-text className="absolute left-[110px] top-[115px] w-[621px] opacity-0 [&_a]:pointer-events-auto">
-            <Wordmark className="text-[142.907px] [text-shadow:0_0_15.5px_rgba(255,255,255,0.65)]" />
-            <DesktopEventDetails />
-          </div>
           <Stars stars={desktopStars} />
+        </div>
+        <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 pointer-events-none sm:block lg:hidden">
+          <Stars stars={tabletStars} />
+        </div>
+        <div className="absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 pointer-events-none sm:hidden">
+          <Stars stars={mobileStars} />
+        </div>
+
+        {/* Text is pinned to the section's edges, not the centered stages, so
+            it never clips when the viewport is narrower than its stage. Its
+            position and wordmark size blend between the frames with width
+            (.hero-text in globals.css); below 640px the wordmark fills the
+            width. */}
+
+        {/* desktop */}
+        <div
+          data-hero-text
+          className="pointer-events-none hero-text absolute z-10 hidden w-[621px] opacity-0 lg:block [&_a]:pointer-events-auto"
+        >
+          <Wordmark className="[text-shadow:0_0_15.5px_rgba(255,255,255,0.65)]" />
+          <DesktopEventDetails />
         </div>
 
         {/* tablet */}
-        <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 pointer-events-none sm:block lg:hidden">
-          <div data-hero-text className="absolute left-[75px] top-[42.34px] opacity-0 [&_a]:pointer-events-auto">
-            <Wordmark className="text-[138.93px]" />
-            <EventDetails date={"Wednesday, November 18  |  6:30-9:00 PM"} iconClassName="opacity-80" />
-          </div>
-          <Stars stars={tabletStars} />
+        <div
+          data-hero-text
+          className="pointer-events-none hero-text absolute z-10 hidden opacity-0 sm:block lg:hidden [&_a]:pointer-events-auto"
+        >
+          <Wordmark />
+          <EventDetails date={"Wednesday, November 18  |  6:30-9:00 PM"} iconClassName="opacity-80" />
         </div>
 
-        {/* mobile */}
-        <div className="absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 pointer-events-none sm:hidden">
-          <div data-hero-text className="absolute left-[36px] top-[275px] flex flex-col gap-[2px] opacity-0 [&_a]:pointer-events-auto">
-            <Wordmark className="text-[95.5px]" />
-            <EventDetails date={"Wed, November 18  |  6:30-9:00 PM"} />
-          </div>
-          <Stars stars={mobileStars} />
+        {/* mobile: at 390px, centered in the table's 2nd horizontal band (y ≈ 241–379) */}
+        <div
+          data-hero-text
+          className="pointer-events-none hero-text absolute z-10 flex flex-col items-center gap-[2px] text-center opacity-0 sm:hidden [&_a]:pointer-events-auto"
+        >
+          <Wordmark />
+          <EventDetails date={"Wed, November 18  |  6:30-9:00 PM"} className="items-center" />
         </div>
       </HeroIntro>
     </section>
