@@ -27,11 +27,13 @@ type Ball = {
 // Sorted back-to-front (by z) so later balls paint over earlier ones.
 // Positions, radii and shadows come from the desktop frame (9026:1631), whose
 // table is this one scaled by 1.0363; mobile radii from 9026:2063, rescaled
-// from its 552px table to this 1017px one.
+// from its 552px table to this 1017px one. All x are shifted +145 from the
+// frame so the white → eight span is centered on tablet and mobile; the
+// desktop table pose shifts back by the same amount (see globals.css).
 const balls: Ball[] = [
   {
     kind: "blue",
-    x: -203.39,
+    x: -58.39,
     z: -328.4,
     rTablet: 28.68,
     rMobile: 57.11,
@@ -39,7 +41,7 @@ const balls: Ball[] = [
   },
   {
     kind: "white",
-    x: -355.35,
+    x: -210.35,
     z: -13.6,
     rTablet: 37.32,
     rMobile: 57.97,
@@ -47,7 +49,7 @@ const balls: Ball[] = [
   },
   {
     kind: "eight",
-    x: 66.26,
+    x: 211.26,
     z: 53.72,
     rTablet: 42.32,
     rMobile: 56.02,
@@ -55,7 +57,7 @@ const balls: Ball[] = [
   },
   {
     kind: "yellow",
-    x: -139.38,
+    x: 5.62,
     z: 376.11,
     rTablet: 49.81,
     rMobile: 55.53,
