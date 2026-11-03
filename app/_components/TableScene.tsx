@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 // The pool table is modelled as a small 3D scene seen by an orthographic
 // camera. The camera's elevation is driven purely by viewport width in CSS
 // (see `.table-scene` in globals.css), so this stays a zero-JS server component.
+// HeroIntro slides the cue in by setting `--slide` on the scene.
 //
 // World coordinates are in tablet-frame px (Figma 9026:1895), origin at the
 // table center: x → right, z → toward the viewer, height h → up.
@@ -175,7 +176,7 @@ export default function TableScene() {
           <g clipPath="url(#table-felt)" fill="#660000">
             {/* unit band like the cue, tapered at the tip end and placed by the light (see globals.css);
                 runs on past x = 1 so the felt clip always ends it at the rim */}
-            <g className="table-cue-shadow" style={cueVars}>
+            <g data-hero-cue className="table-cue-shadow opacity-0" style={cueVars}>
               <polygon points="0.0008,0.0947 1,-0.5 2,-0.5 2,0.4375 1,0.4375 0,0.5" />
             </g>
             {balls.map((ball) => (
@@ -188,11 +189,15 @@ export default function TableScene() {
         {balls.map((ball) => (
           <g key={ball.kind}>
             {ball === cueBall && (
-              <g className="table-cue" style={cueVars}>
+              <g data-hero-cue className="table-cue opacity-0" style={cueVars}>
                 <CueArt />
               </g>
             )}
-            <g className="table-ball" style={ballVars(ball)}>
+            <g
+              data-cue-ball={ball === cueBall || undefined}
+              className="table-ball"
+              style={ballVars(ball)}
+            >
               <BallArt kind={ball.kind} />
             </g>
           </g>

@@ -169,10 +169,12 @@ body {
 /* The cue is a 3D segment aimed at the cue ball from the right, at a point
    0.32 radii above its center: horizontal heading -10.14° off the x axis,
    butt raised 5.1°. Unit direction tip → butt is (0.98049, -0.17532, 0.08889);
-   it's 792.2 long and its tip sits 2.42 radii out (desktop frame 9026:1631). */
+   it's 792.2 long and its tip sits 2.42 radii out (desktop frame 9026:1631).
+   --slide (set from JS on .table-scene, in ball radii) pulls it back along
+   that axis for the intro. */
 .table-cue,
 .table-cue-shadow {
-  --gap: calc(2.4205 * var(--r));
+  --gap: calc((2.4205 + var(--slide, 0)) * var(--r));
   --tx: calc(var(--x) + 0.98049 * var(--gap));
   --tz: calc(var(--z) - 0.17532 * var(--gap));
   --th: calc(1.3198 * var(--r) + 0.08889 * var(--gap));

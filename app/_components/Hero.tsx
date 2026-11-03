@@ -1,9 +1,11 @@
 import Image from "next/image";
+import HeroIntro from "./HeroIntro";
 import TableScene from "./TableScene";
 
 // The hero has three fixed-size stages (desktop 1280, tablet 744, mobile 390),
 // each centered and swapped at a breakpoint. Only the pool table scene moves
 // continuously with width, desktop → tablet → mobile (see TableScene).
+// HeroIntro plays the entrance: glowing title, table light flicker, cue slide.
 
 // Star decorations. `inset` is the star's offset within its square bounding box.
 const STAR_INSET_LG = "inset-[8.23%_8.82%_10.56%_8.82%]";
@@ -59,12 +61,13 @@ function Stars({ stars }: { stars: Star[] }) {
 // "Stride" with the dot over the i. Sized by font-size so it scales per stage.
 function Wordmark({ className }: { className: string }) {
   return (
-    <h1 className={`relative whitespace-nowrap font-display leading-[1.4756] text-cream ${className}`}>
+    <h1 data-hero-glow-title className={`relative whitespace-nowrap font-display leading-[1.4756] text-cream ${className}`}>
       Stride
       <Image
         src="/hero/stride-dot.svg"
         alt=""
         aria-hidden
+        data-hero-glow-dot
         width={41.6614}
         height={41.6614}
         className="absolute left-[1.5441em] top-[0.4228em] size-[0.2637em] max-w-none"
@@ -146,34 +149,39 @@ function DesktopEventDetails() {
 export default function Hero() {
   return (
     <section className="relative h-[760px] w-full overflow-clip bg-black">
-      <TableScene />
-
-      {/* desktop */}
-      <div className="absolute left-1/2 top-0 hidden h-full w-[1280px] -translate-x-1/2 lg:block">
-        <div className="absolute left-[110px] top-[115px] w-[621px]">
-          <Wordmark className="text-[142.907px] [text-shadow:0_0_15.5px_rgba(255,255,255,0.65)]" />
-          <DesktopEventDetails />
+      <HeroIntro>
+        {/* table light (flickers on) */}
+        <div data-hero-light className="absolute inset-0 opacity-[0.08] brightness-30">
+          <TableScene />
         </div>
-        <Stars stars={desktopStars} />
-      </div>
 
-      {/* tablet */}
-      <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 sm:block lg:hidden">
-        <div className="absolute left-[75px] top-[42.34px]">
-          <Wordmark className="text-[138.93px]" />
-          <EventDetails date={"Wednesday, November 18  |  6:30-9:00 PM"} iconClassName="opacity-80" />
+        {/* desktop */}
+        <div className="absolute left-1/2 top-0 hidden h-full w-[1280px] -translate-x-1/2 lg:block">
+          <div data-hero-text className="absolute left-[110px] top-[115px] w-[621px] opacity-0">
+            <Wordmark className="text-[142.907px] [text-shadow:0_0_15.5px_rgba(255,255,255,0.65)]" />
+            <DesktopEventDetails />
+          </div>
+          <Stars stars={desktopStars} />
         </div>
-        <Stars stars={tabletStars} />
-      </div>
 
-      {/* mobile */}
-      <div className="absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 sm:hidden">
-        <div className="absolute left-[36px] top-[275px] flex flex-col gap-[2px]">
-          <Wordmark className="text-[95.5px]" />
-          <EventDetails date={"Wed, November 18  |  6:30-9:00 PM"} />
+        {/* tablet */}
+        <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 sm:block lg:hidden">
+          <div data-hero-text className="absolute left-[75px] top-[42.34px] opacity-0">
+            <Wordmark className="text-[138.93px]" />
+            <EventDetails date={"Wednesday, November 18  |  6:30-9:00 PM"} iconClassName="opacity-80" />
+          </div>
+          <Stars stars={tabletStars} />
         </div>
-        <Stars stars={mobileStars} />
-      </div>
+
+        {/* mobile */}
+        <div className="absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 sm:hidden">
+          <div data-hero-text className="absolute left-[36px] top-[275px] flex flex-col gap-[2px] opacity-0">
+            <Wordmark className="text-[95.5px]" />
+            <EventDetails date={"Wed, November 18  |  6:30-9:00 PM"} />
+          </div>
+          <Stars stars={mobileStars} />
+        </div>
+      </HeroIntro>
     </section>
   );
 }
