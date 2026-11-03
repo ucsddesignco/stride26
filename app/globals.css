@@ -41,26 +41,20 @@ body {
    needed.
    Wordmark size (one variable for all three stages, so it stays continuous
    where they swap at 640 and 1024): 142.907 (≥1024) → 138.93 (744) on --u,
-   then toward the mobile fit at 640 (168.34); below 640 it fills the block's
-   span, --pad to 44px from the right edge. --wordmark-em is "Stride"'s advance
-   width in Neue Plak Extended Bold, kerning included (measured in Chrome:
-   3149px at 1000px). */
+   then held at 138.93 until it reaches the padded span (--pad on the left,
+   44px on the right, ≈537px viewport), below which it shrinks to fill it.
+   --wordmark-em is "Stride"'s advance width in Neue Plak Extended Bold,
+   kerning included (measured in Chrome: 3149px at 1000px). */
 .hero-text {
   --pad: calc(75px + 35px * var(--u) - 31px * var(--t)); /* 110 → 75 → 44 */
   --wordmark-em: 3.149;
-  /* 3.4038 = 354 / 104: the 744 → 640 ramp, in --t so the stepped fallback works */
-  --wordmark-size: calc(
-    138.93px + 3.977px * var(--u) + 29.41px * clamp(0, var(--t) * 3.4038, 1)
+  --wordmark-size: min(
+    138.93px + 3.977px * var(--u),
+    (100cqw - var(--pad) - 44px) / var(--wordmark-em)
   );
   left: calc(var(--pad) + var(--t) * 0.5 * (100% - var(--pad) - 44px));
   top: calc(124px - 9px * var(--u) + 186px * var(--t)); /* 115 → 124 → 310 */
   translate: calc(var(--t) * -50%) calc(var(--t) * -50%);
-}
-
-@media (width < 40rem) {
-  .hero-text {
-    --wordmark-size: calc((100cqw - var(--pad) - 44px) / var(--wordmark-em));
-  }
 }
 
 .hero-wordmark {

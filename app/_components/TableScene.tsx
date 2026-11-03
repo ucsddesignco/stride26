@@ -31,6 +31,8 @@ type Ball = {
 // from its 552px table to this 1017px one. All x are shifted +145 from the
 // frame so the white → eight span is centered on tablet and mobile; the
 // desktop table pose shifts back by the same amount (see globals.css).
+// The white and eight balls (and so the cue) sit 175 further toward the viewer
+// than the frame, so on mobile they clear the hero text with ≥8px to spare.
 const balls: Ball[] = [
   {
     kind: "blue",
@@ -43,7 +45,7 @@ const balls: Ball[] = [
   {
     kind: "white",
     x: -210.35,
-    z: -13.6,
+    z: 161.4,
     rTablet: 37.32,
     rMobile: 57.97,
     shadow: { x: 0.6288, z: -1.6979, m: [1.3897, 0.8266, -0.0747, 2.3974] },
@@ -51,7 +53,7 @@ const balls: Ball[] = [
   {
     kind: "eight",
     x: 211.26,
-    z: 53.72,
+    z: 228.72,
     rTablet: 42.32,
     rMobile: 56.02,
     shadow: { x: 0.8281, z: -1.5972, m: [1.474, 0.252, -0.0228, 2.5428] },

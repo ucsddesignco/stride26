@@ -185,8 +185,8 @@ export default function Hero() {
         {/* Text is pinned to the section's edges, not the centered stages, so
             it never clips when the viewport is narrower than its stage. Its
             position and wordmark size blend between the frames with width
-            (.hero-text in globals.css); below 640px the wordmark fills the
-            width. */}
+            (.hero-text in globals.css); the wordmark holds its tablet size
+            until it reaches the side padding, then shrinks to fit. */}
 
         {/* desktop */}
         <div
@@ -206,13 +206,14 @@ export default function Hero() {
           <EventDetails date={"Wednesday, November 18  |  6:30-9:00 PM"} iconClassName="opacity-80" />
         </div>
 
-        {/* mobile: at 390px, centered in the table's 2nd horizontal band (y ≈ 241–379) */}
+        {/* mobile: the block is centered (middle at y 310 at 390px); the details
+            are left-aligned with the wordmark */}
         <div
           data-hero-text
-          className="pointer-events-none hero-text absolute z-10 flex flex-col items-center gap-[2px] text-center opacity-0 sm:hidden [&_a]:pointer-events-auto"
+          className="pointer-events-none hero-text absolute z-10 flex flex-col items-start gap-[2px] opacity-0 sm:hidden [&_a]:pointer-events-auto"
         >
           <Wordmark />
-          <EventDetails date={"Wed, November 18  |  6:30-9:00 PM"} className="items-center" />
+          <EventDetails date={"Wed, November 18  |  6:30-9:00 PM"} />
         </div>
       </HeroIntro>
     </section>
