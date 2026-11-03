@@ -49,21 +49,26 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const root = scope.current;
-    const scene = root?.querySelector<HTMLElement>(".table-scene");
     const cue = root?.querySelector<SVGElement>("[data-pool-cue]");
     const ball = root?.querySelector<SVGElement>("[data-cue-ball]");
     const shadow = root?.querySelector<SVGElement>("[data-cue-ball-shadow]");
-    if (!root || !scene || !cue || !ball || !shadow) return;
+    if (!root || !cue || !ball || !shadow) return;
+    // the cue and its shadow: the only parts that read --slide
+    const cueParts = root.querySelectorAll<SVGElement>("[data-hero-cue]");
 
     let mounted = true;
     let busy = false;
     let raf: number | null = null;
     const running: AnimationPlaybackControls[] = [];
+    let hoverAnim: AnimationPlaybackControls | null = null;
 
     // cue: shot travel + hover nudge, both along the cue axis
     const shot = motionValue(0);
     const hover = motionValue(0);
-    const setSlide = () => scene.style.setProperty("--slide", String(shot.get() + hover.get()));
+    const setSlide = () => {
+      const slide = String(shot.get() + hover.get());
+      cueParts.forEach((el) => el.style.setProperty("--slide", slide));
+    };
     const unsubscribe = [shot.on("change", setSlide), hover.on("change", setSlide)];
 
     const setBall = (name: BallVar, v: number) => {
@@ -193,9 +198,12 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       busy = false;
     };
 
+    // Hover springs live outside `running`, which is only cleared after a
+    // shot, so hovering without shooting doesn't pile up controls.
     const nudge = (to: number) => {
       if (busy || !ready()) return;
-      run(hover, to, { type: "spring", stiffness: 300, damping: 20 });
+      hoverAnim?.stop();
+      hoverAnim = animate(hover, to, { type: "spring", stiffness: 300, damping: 20 });
     };
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter" && e.key !== " ") return;
@@ -216,6 +224,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       mounted = false;
       if (raf !== null) cancelAnimationFrame(raf);
       running.forEach((c) => c.stop());
+      hoverAnim?.stop();
       unsubscribe.forEach((u) => u());
       for (const el of [cue, ball]) {
         el.removeEventListener("click", shoot);
