@@ -12,6 +12,22 @@
   --font-sans: var(--font-nb-international), sans-serif;
   --font-display: var(--font-neue-plak), sans-serif;
   --font-plak: var(--font-neue-plak-regular), sans-serif;
+  /* Hero stars. Hero.tsx sets each star's own duration and delay inline. */
+  --animate-star-spin: star-spin 12.5s linear infinite;
+  /* One way only: `alternate` grows the star back, so a full loop is twice this. */
+  --animate-star-twinkle: star-twinkle 4s ease-in-out infinite alternate;
+
+  @keyframes star-spin {
+    to {
+      rotate: 360deg;
+    }
+  }
+
+  @keyframes star-twinkle {
+    to {
+      scale: 0;
+    }
+  }
 }
 
 body {

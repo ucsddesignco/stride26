@@ -18,43 +18,60 @@ const RED = { src: "/hero/star-red.svg", w: 29.9892, h: 29.5714, inset: STAR_INS
 const YELLOW = { src: "/hero/star-yellow-1.svg", w: 50.239, h: 49.5335, inset: STAR_INSET_LG };
 const BLUE = { src: "/hero/star-blue.svg", w: 75.7703, h: 74.7063, inset: STAR_INSET_LG };
 
-type Star = typeof RED & { box: string };
+// `spin` is one full turn and `delay` a negative start offset. Each differs per
+// star so they drift out of step instead of turning together like gears.
+// `twinkle` is one shrink (a full loop is twice that) and `twinkleDelay` its
+// start offset, spread across the loop so the stars don't pulse together.
+type Star = typeof RED & {
+  box: string;
+  spin: string;
+  delay: string;
+  twinkle: string;
+  twinkleDelay: string;
+};
 
 // Figma 9026:1631
 const desktopStars: Star[] = [
-  { ...RED, box: "left-[45px] top-[132px] size-[48px]" },
-  { ...RED, box: "left-[866px] top-[300px] size-[48px]" },
-  { ...YELLOW, box: "left-[657px] top-[84px] size-[61px]" },
-  { ...BLUE, box: "left-[1119px] top-[175px] size-[92px]" },
-  { ...BLUE, box: "left-[146px] top-[505px] size-[92px]" },
+  { ...RED, box: "left-[45px] top-[132px] size-[48px]", spin: "12.5s", delay: "0s", twinkle: "4s", twinkleDelay: "0s" },
+  { ...RED, box: "left-[866px] top-[300px] size-[48px]", spin: "11.5s", delay: "-0.3s", twinkle: "3.5s", twinkleDelay: "-3.2s" },
+  { ...YELLOW, box: "left-[657px] top-[84px] size-[61px]", spin: "13.5s", delay: "-0.6s", twinkle: "4.5s", twinkleDelay: "-6.5s" },
+  { ...BLUE, box: "left-[1119px] top-[187.5px] size-[67px]", spin: "12s", delay: "-0.9s", twinkle: "3.75s", twinkleDelay: "-2.5s" },
+  { ...BLUE, box: "left-[146px] top-[505px] size-[92px] rotate-[13.61deg]", spin: "13s", delay: "-1.2s", twinkle: "4.25s", twinkleDelay: "-6.1s" },
 ];
 
 // Figma 9026:1895
 const tabletStars: Star[] = [
-  { ...RED, box: "left-[136px] top-[26.34px] size-[37px]" },
-  { ...RED, box: "left-[740px] top-[318px] size-[37px]" },
-  { ...YELLOW, box: "left-[623px] top-[75.34px] size-[61px]" },
-  { ...BLUE, box: "left-[78px] top-[380.34px] size-[92px]" },
+  { ...RED, box: "left-[136px] top-[26.34px] size-[37px]", spin: "12.5s", delay: "0s", twinkle: "4s", twinkleDelay: "0s" },
+  { ...RED, box: "left-[740px] top-[318px] size-[37px]", spin: "11.5s", delay: "-0.3s", twinkle: "3.5s", twinkleDelay: "-3.2s" },
+  { ...YELLOW, box: "left-[623px] top-[75.34px] size-[61px]", spin: "13.5s", delay: "-0.6s", twinkle: "4.5s", twinkleDelay: "-6.5s" },
+  { ...BLUE, box: "left-[78px] top-[380.34px] size-[92px]", spin: "12s", delay: "-0.9s", twinkle: "3.75s", twinkleDelay: "-2.5s" },
 ];
 
-// Figma 9026:2063
+// Figma 9026:2071
 const mobileStars: Star[] = [
-  { ...RED, box: "left-[46px] top-[45.34px] size-[37px]" },
-  { ...RED, box: "left-[300px] top-[671.34px] size-[37px]" },
-  { ...YELLOW, box: "left-[306px] top-[45.34px] size-[61px]" },
-  { ...BLUE, box: "left-[112px] top-[606.34px] size-[92px]" },
+  { ...RED, box: "left-[112px] top-[0.34px] size-[37px]", spin: "12.5s", delay: "0s", twinkle: "4s", twinkleDelay: "0s" },
+  { ...RED, box: "left-[300px] top-[671.34px] size-[37px]", spin: "11.5s", delay: "-0.3s", twinkle: "3.5s", twinkleDelay: "-3.2s" },
+  { ...YELLOW, box: "left-[306px] top-[45.34px] size-[61px]", spin: "13.5s", delay: "-0.6s", twinkle: "4.5s", twinkleDelay: "-6.5s" },
+  { ...BLUE, box: "left-[112px] top-[606.34px] size-[92px] rotate-[7.8deg]", spin: "12s", delay: "-0.9s", twinkle: "3.75s", twinkleDelay: "-2.5s" },
 ];
 
+// The art has nine points, so its true center sits below its box center (51.43%
+// down, measured from the SVG paths). Spinning around it keeps the star from
+// wobbling. The spin is on the inner div so it adds to a box's static tilt.
 function Stars({ stars }: { stars: Star[] }) {
   return stars.map((star, i) => (
     <div key={i} aria-hidden className={`absolute ${star.box}`}>
-      <div className={`absolute ${star.inset}`}>
+      <div
+        className={`absolute ${star.inset} origin-[50%_51.43%] motion-safe:animate-star-spin`}
+        style={{ animationDuration: star.spin, animationDelay: star.delay }}
+      >
         <Image
           src={star.src}
           alt=""
           width={star.w}
           height={star.h}
-          className="block size-full max-w-none"
+          className="block size-full max-w-none origin-[50%_51.43%] motion-safe:animate-star-twinkle"
+          style={{ animationDuration: star.twinkle, animationDelay: star.twinkleDelay }}
         />
       </div>
     </div>
