@@ -2,6 +2,7 @@ import Image from "next/image";
 import HeroIntro from "./HeroIntro";
 import PoolShot from "./PoolShot";
 import TableScene from "./TableScene";
+import { BLUE, RED, YELLOW, type StarArt } from "./stars";
 
 // The hero has three fixed-size stages (desktop 1280, tablet 744, mobile 390),
 // each centered and swapped at a breakpoint. Only the pool table scene moves
@@ -10,15 +11,8 @@ import TableScene from "./TableScene";
 // Then PoolShot lets you take the shot; the stages above the table pass
 // pointer events through to it, except on their links.
 
-// Star decorations. `inset` is the star's offset within its square bounding box.
-const STAR_INSET_LG = "inset-[8.23%_8.82%_10.56%_8.82%]";
-const STAR_INSET_SM = "inset-[8.9%_9.47%_11.18%_9.47%]";
-
-const RED = { src: "/hero/star-red.svg", w: 29.9892, h: 29.5714, inset: STAR_INSET_SM };
-const YELLOW = { src: "/hero/star-yellow-1.svg", w: 50.239, h: 49.5335, inset: STAR_INSET_LG };
-const BLUE = { src: "/hero/star-blue.svg", w: 75.7703, h: 74.7063, inset: STAR_INSET_LG };
-
-type Star = typeof RED & { box: string };
+// Star decorations, hand-placed per stage.
+type Star = StarArt & { box: string };
 
 // Figma 9026:1631
 const desktopStars: Star[] = [
