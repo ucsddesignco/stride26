@@ -224,6 +224,10 @@ body {
   --tx: calc(var(--x) + var(--ox) + var(--dx) * var(--gap));
   --tz: calc(var(--z) + var(--oz) + var(--dz) * var(--gap));
   --th: calc(1.3198 * var(--r) + 0.08889 * var(--gap));
+  /* shrinks the cue and its shadow with depth, like the ball they're aimed at:
+     --depth-slope comes from TableScene. It's 1 in the first pose (--oz is 0)
+     and top-down (--p is 0). Both tips are their transform origins, so they stay put. */
+  --cs: calc(1 + var(--depth-slope) * var(--p) * var(--oz) / var(--r));
 }
 
 .table-cue {
@@ -233,7 +237,7 @@ body {
       calc((var(--tz) * var(--s) - var(--th) * var(--c)) * 1px)
     )
     rotate(atan2(var(--dy), var(--dx)))
-    scale(calc(792.2 * hypot(var(--dx), var(--dy))), 19);
+    scale(calc(792.2 * hypot(var(--dx), var(--dy)) * var(--cs)), calc(19 * var(--cs)));
 }
 
 /* The browser's outline would stretch with the cue's scale into a band across
@@ -294,10 +298,10 @@ body {
       calc((var(--tz) + var(--th) * var(--lz) + var(--ux) * var(--peek) * var(--hs)) * 1px)
     )
     matrix(
-      var(--ax),
-      var(--az),
-      calc(-1 * var(--uz) * var(--w) * var(--hs)),
-      calc(var(--ux) * var(--w) * var(--hs)),
+      calc(var(--ax) * var(--cs)),
+      calc(var(--az) * var(--cs)),
+      calc(-1 * var(--uz) * var(--w) * var(--hs) * var(--cs)),
+      calc(var(--ux) * var(--w) * var(--hs) * var(--cs)),
       0,
       0
     );

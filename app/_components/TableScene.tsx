@@ -88,7 +88,11 @@ function ballVars(ball: Ball) {
   } as CSSProperties;
 }
 
-const cueVars = ballVars(cueBall);
+// At the tilted angles things are drawn bigger toward the viewer. This is that
+// growth in world px of radius per world px of depth (blue → white in the frame).
+export const DEPTH_SLOPE = 0.0176;
+
+const cueVars = { ...ballVars(cueBall), "--depth-slope": DEPTH_SLOPE } as CSSProperties;
 
 // Ball artwork, drawn on a unit circle (scaled to the ball radius in CSS).
 function BallArt({ kind }: { kind: Ball["kind"] }) {

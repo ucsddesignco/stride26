@@ -10,7 +10,7 @@ import {
   type ValueAnimationTransition,
 } from "framer-motion";
 import { CUE_PAUSE, KEYFRAMES } from "./HeroIntro";
-import { TABLE_RADIUS, blueBall, cueBall, eightBall } from "./TableScene";
+import { DEPTH_SLOPE, TABLE_RADIUS, blueBall, cueBall, eightBall } from "./TableScene";
 
 // Two shots on a table that carries on past the light. Click the table or the
 // cue: the white ball fades out at the left edge, bounces off a wall
@@ -71,9 +71,6 @@ const HOVER_NUDGE = 0.18;
 const SQUASH_STRIKE = 1;
 const SQUASH_SMACK = 1.6;
 
-// At the tilted angles balls are drawn bigger toward the viewer. This is that
-// growth in world px of radius per world px of depth (blue → white in the frame).
-const DEPTH_SLOPE = 0.0176;
 // cos of the tablet camera's elevation, where the perspective sizing is 1
 const COS_TABLET = 0.97347;
 
@@ -176,7 +173,6 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     if (!root || !cue || !felt || !stageEl || !lightEl || !dimEl) return;
     // the cue and its shadow: the only parts that read --slide
     const cueParts = root.querySelectorAll<SVGElement>("[data-hero-cue]");
-    const cueShadow = root.querySelector<SVGElement>("[data-hero-cue]:not([data-pool-cue])");
     const tableParts = root.querySelectorAll<SVGElement>(".table-plane, .table-ball");
 
     const makeBall = (spec: BallSpec): SceneBall | null => {
@@ -421,8 +417,6 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         el.style.setProperty("--hz", String(hz));
         el.style.setProperty("--hs", "-1");
       });
-      // up here its shadow falls past the back rim, leaving only a speck on the felt
-      if (cueShadow) cueShadow.style.visibility = "hidden";
       writeSlide(0);
       const tipEdge = cue.getBoundingClientRect().right;
       return (tipEdge + CUE_OFFSCREEN_MARGIN) / cueScreenRate(hx);
@@ -568,7 +562,6 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         }
       });
       cueParts.forEach((el) => CUE_VARS.forEach((name) => el.style.removeProperty(name)));
-      cueShadow?.style.removeProperty("visibility");
       setFinished(false);
     };
 
