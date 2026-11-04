@@ -53,7 +53,7 @@ const CUE_OFFSCREEN_MARGIN = 40;
 const START_AMOUNT = 0.3;
 
 const TITLE_PAUSE = 1; // s between title and flicker
-const CUE_PAUSE = 0.5; // s between flicker and cue
+export const CUE_PAUSE = 0.5; // s between flicker and cue
 const TEXT_FADE = 0.6;
 const CUE_SLIDE = 1.1;
 const CUE_EASE = [0.16, 1, 0.3, 1] as const;
@@ -102,7 +102,7 @@ function buildKeyframes() {
   };
 }
 
-const KEYFRAMES = buildKeyframes();
+export const KEYFRAMES = buildKeyframes();
 const GLOW_FADE = KEYFRAMES.duration; // fades out alongside the flicker
 
 export default function HeroIntro({ children }: { children: ReactNode }) {

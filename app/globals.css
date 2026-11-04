@@ -236,10 +236,10 @@ body {
     scale(calc(792.2 * hypot(var(--dx), var(--dy))), 19);
 }
 
-/* Keyboard focus: the browser's outline would stretch with the cue's scale into
-   a band across the hero, so the cue draws its own, with a non-scaling stroke.
-   Hidden once the cue is inactive (aria-disabled), even if it still has focus. */
-.table-cue:focus-visible {
+/* The browser's outline would stretch with the cue's scale into a band across
+   the hero, even after a mouse click, so it's off for all focus. For keyboard
+   focus the cue draws its own, with a non-scaling stroke. */
+.table-cue:focus {
   outline: none;
 }
 
@@ -248,7 +248,7 @@ body {
   pointer-events: none;
 }
 
-.table-cue:focus-visible:not([aria-disabled]) .table-cue-focus {
+.table-cue:focus-visible .table-cue-focus {
   display: block;
 }
 
