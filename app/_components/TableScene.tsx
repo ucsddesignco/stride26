@@ -149,6 +149,18 @@ function CueArt() {
       <rect x="0.6945" y="-0.5" width="0.3055" height="1" fill="#9E1717" />
       <rect x="0.0055" y="-0.5" width="0.0302" height="1" fill="#FFFFFF" />
       <rect x="0" y="-0.5" width="0.0058" height="1" fill="#A4CDF9" />
+      {/* keyboard focus outline, about 2px clear of the band (see globals.css) */}
+      <rect
+        className="table-cue-focus"
+        x="-0.0038"
+        y="-0.62"
+        width="1.0076"
+        height="1.24"
+        fill="none"
+        stroke="#FFFFFF"
+        strokeWidth="2"
+        vectorEffect="non-scaling-stroke"
+      />
     </>
   );
 }

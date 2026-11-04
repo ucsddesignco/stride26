@@ -236,6 +236,22 @@ body {
     scale(calc(792.2 * hypot(var(--dx), var(--dy))), 19);
 }
 
+/* Keyboard focus: the browser's outline would stretch with the cue's scale into
+   a band across the hero, so the cue draws its own, with a non-scaling stroke.
+   Hidden once the cue is inactive (aria-disabled), even if it still has focus. */
+.table-cue:focus-visible {
+  outline: none;
+}
+
+.table-cue-focus {
+  display: none;
+  pointer-events: none;
+}
+
+.table-cue:focus-visible:not([aria-disabled]) .table-cue-focus {
+  display: block;
+}
+
 /* Shadow of the cue on the felt, cast by the same light as the balls rather
    than the Figma band (9026:1665). The light pushes a point at height h by
    h·(--lx, --lz) on the felt: at the tablet angle that's the average of the
