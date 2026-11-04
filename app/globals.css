@@ -55,6 +55,9 @@ body {
    310 (≤390px), linear in --u / --t. Centering blends in through left plus
    translate(−50%·t): translate % is of the block's own size, so no width is
    needed.
+   From 1280 up, left follows the page content's edge (max-w-7xl px-30: a
+   centered 1280px container with 120px padding). max() hands over at 1260,
+   where the two meet at 110, so the text never jumps.
    Wordmark size (one variable for all three stages, so it stays continuous
    where they swap at 640 and 1024): 142.907 (≥1024) → 138.93 (744) on --u,
    then held at 138.93 until it reaches the padded span (--pad on the left,
@@ -68,7 +71,10 @@ body {
     138.93px + 3.977px * var(--u),
     (100cqw - var(--pad) - 44px) / var(--wordmark-em)
   );
-  left: calc(var(--pad) + var(--t) * 0.5 * (100% - var(--pad) - 44px));
+  left: max(
+    var(--pad) + var(--t) * 0.5 * (100% - var(--pad) - 44px),
+    (100cqw - 1280px) / 2 + 120px
+  );
   top: calc(124px - 9px * var(--u) + 186px * var(--t)); /* 115 → 124 → 310 */
   translate: calc(var(--t) * -50%) calc(var(--t) * -50%);
 }
