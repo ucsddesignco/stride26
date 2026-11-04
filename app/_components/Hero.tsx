@@ -25,8 +25,8 @@ const desktopStars: Star[] = [
   { ...RED, box: "left-[45px] top-[132px] size-[48px]" },
   { ...RED, box: "left-[866px] top-[300px] size-[48px]" },
   { ...YELLOW, box: "left-[657px] top-[84px] size-[61px]" },
-  { ...BLUE, box: "left-[1119px] top-[175px] size-[92px]" },
-  { ...BLUE, box: "left-[146px] top-[505px] size-[92px]" },
+  { ...BLUE, box: "left-[1119px] top-[187.5px] size-[67px]" },
+  { ...BLUE, box: "left-[146px] top-[505px] size-[92px] rotate-[13.61deg]" },
 ];
 
 // Figma 9026:1895
@@ -37,12 +37,12 @@ const tabletStars: Star[] = [
   { ...BLUE, box: "left-[78px] top-[380.34px] size-[92px]" },
 ];
 
-// Figma 9026:2063
+// Figma 9026:2071
 const mobileStars: Star[] = [
-  { ...RED, box: "left-[46px] top-[45.34px] size-[37px]" },
+  { ...RED, box: "left-[112px] top-[0.34px] size-[37px]" },
   { ...RED, box: "left-[300px] top-[671.34px] size-[37px]" },
   { ...YELLOW, box: "left-[306px] top-[45.34px] size-[61px]" },
-  { ...BLUE, box: "left-[112px] top-[606.34px] size-[92px]" },
+  { ...BLUE, box: "left-[112px] top-[606.34px] size-[92px] rotate-[7.8deg]" },
 ];
 
 function Stars({ stars }: { stars: Star[] }) {
