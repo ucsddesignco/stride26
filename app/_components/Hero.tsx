@@ -1,17 +1,20 @@
 import Image from "next/image";
 import HeroIntro from "./HeroIntro";
 import PoolShot from "./PoolShot";
+import StarField from "./StarField";
 import TableScene from "./TableScene";
 import { BLUE, RED, YELLOW, type StarArt } from "./stars";
 
-// The hero has three fixed-size stages (desktop 1280, tablet 744, mobile 390),
-// each centered and swapped at a breakpoint. Only the pool table scene moves
-// continuously with width, desktop → tablet → mobile (see TableScene).
+// The hero blends between three frames (desktop 1280, tablet 744, mobile 390):
+// the text and the pool table scene move continuously with width (globals.css,
+// TableScene). Stars spawn around them at random (StarField); with reduced
+// motion, static stars sit in fixed-size stages swapped at a breakpoint.
 // HeroIntro plays the entrance: glowing title, table light flicker, cue slide.
 // Then PoolShot lets you take the shot; the stages above the table pass
 // pointer events through to it, except on their links.
 
-// Star decorations, hand-placed per stage.
+// Static stars, hand-placed per stage; shown only with reduced motion (the
+// rest of the time StarField spawns them).
 type Star = StarArt & { box: string };
 
 // Figma 9026:1631
@@ -166,15 +169,18 @@ export default function Hero() {
           <div data-hero-dim aria-hidden className="pointer-events-none absolute inset-0 bg-black opacity-70" />
         </div>
 
-        {/* star stages: fixed-size frames centered per breakpoint */}
-        <div className="absolute left-1/2 top-0 hidden h-full w-[1280px] -translate-x-1/2 pointer-events-none lg:block">
-          <Stars stars={desktopStars} />
-        </div>
-        <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 pointer-events-none sm:block lg:hidden">
-          <Stars stars={tabletStars} />
-        </div>
-        <div className="absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 pointer-events-none sm:hidden">
-          <Stars stars={mobileStars} />
+        {/* stars: spawned at random; static stages only with reduced motion */}
+        <StarField />
+        <div className="motion-safe:hidden">
+          <div className="absolute left-1/2 top-0 hidden h-full w-[1280px] -translate-x-1/2 pointer-events-none lg:block">
+            <Stars stars={desktopStars} />
+          </div>
+          <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 pointer-events-none sm:block lg:hidden">
+            <Stars stars={tabletStars} />
+          </div>
+          <div className="absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 pointer-events-none sm:hidden">
+            <Stars stars={mobileStars} />
+          </div>
         </div>
 
         {/* Text is pinned to the section's edges, not the centered stages, so
