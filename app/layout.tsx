@@ -17,6 +17,14 @@ const neuePlak = localFont({
   display: 'swap',
 });
 
+const neuePlakRegular = localFont({
+  src: '../public/fonts/neue-plak/Neue Plak Regular.woff2',
+  weight: '400',
+  style: 'normal',
+  variable: '--font-neue-plak-regular',
+  display: 'swap',
+});
+
 
 export const metadata = {
   title: 'Stride Base Layout',
@@ -31,7 +39,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${nbInternational.variable} ${neuePlak.variable}`}
+      className={`${nbInternational.variable} ${neuePlak.variable} ${neuePlakRegular.variable}`}
     >
       <body className="font-sans antialiased">{children}</body>
     </html>

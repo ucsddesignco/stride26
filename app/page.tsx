@@ -1,6 +1,7 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import FAQ from "./Components/FAQ";
-import ArrowIcon from "./Components/ArrowIcon";
+import FAQ from "./_components/FAQ";
+import ArrowIcon from "./_components/ArrowIcon";
+import Hero from "./_components/Hero";
 
 export default function Home() {
   return (
@@ -28,9 +29,7 @@ export default function Home() {
       </nav>
 
       {/* hero */}
-      <section className="min-h-[760px] flex flex-col items-center justify-center text-center px-6 bg-gray-50">
-        <div className="max-w-3xl space-y-6"></div>
-      </section>
+      <Hero></Hero>
 
       {/* intro */}
       <section className="py-30 max-w-7xl mx-auto px-30">
