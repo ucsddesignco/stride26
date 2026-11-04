@@ -12,8 +12,8 @@ import {
 import { CUE_PAUSE, KEYFRAMES } from "./HeroIntro";
 import { TABLE_RADIUS, blueBall, cueBall, eightBall } from "./TableScene";
 
-// Two shots on a table that carries on past the light. Click the cue (or the
-// cue ball): the white ball fades out at the left edge, bounces off a wall
+// Two shots on a table that carries on past the light. Click the table or the
+// cue: the white ball fades out at the left edge, bounces off a wall
 // nobody can see, fades back in on the top edge and smacks the blue ball, which
 // rolls out of the light while the white ball slows and settles on its spot. The
 // cue then comes in from the left, and a second click sends the white ball out
@@ -627,9 +627,15 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       busy = false;
     };
 
-    // The cue counts too: with reduced motion it's left faded out over the table.
+    const playNext = () => {
+      if (isDone()) rerack();
+      else shoot();
+    };
+
+    // The cue counts too: it can stick out past the felt, and with reduced motion
+    // it's left faded out over the table.
     const onTableClick = (e: MouseEvent) => {
-      if ((e.target as Element).closest(".table-plane, .table-ball, [data-pool-cue]")) rerack();
+      if ((e.target as Element).closest(".table-plane, .table-ball, [data-pool-cue]")) playNext();
     };
 
     const offscreen = new IntersectionObserver((entries) => {
@@ -647,17 +653,13 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Enter" && e.key !== " ") return;
       e.preventDefault();
-      if (isDone()) rerack();
-      else shoot();
+      playNext();
     };
     const onEnter = () => nudge(HOVER_NUDGE);
     const onLeave = () => nudge(0);
 
-    for (const el of [cue, white.el]) {
-      el.addEventListener("click", shoot);
-      el.addEventListener("pointerenter", onEnter);
-      el.addEventListener("pointerleave", onLeave);
-    }
+    cue.addEventListener("pointerenter", onEnter);
+    cue.addEventListener("pointerleave", onLeave);
     cue.addEventListener("keydown", onKey);
     root.addEventListener("click", onTableClick);
 
@@ -666,11 +668,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       root.removeEventListener("click", onTableClick);
       stopAll();
       unsubscribe.forEach((u) => u());
-      for (const el of [cue, white.el]) {
-        el.removeEventListener("click", shoot);
-        el.removeEventListener("pointerenter", onEnter);
-        el.removeEventListener("pointerleave", onLeave);
-      }
+      cue.removeEventListener("pointerenter", onEnter);
+      cue.removeEventListener("pointerleave", onLeave);
       cue.removeEventListener("keydown", onKey);
     };
   }, []);
