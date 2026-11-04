@@ -98,6 +98,14 @@ function Wordmark({ className = "" }: { className?: string }) {
   );
 }
 
+const CALENDAR_HREF = "/stride-2026.ics";
+const MAPS_HREF =
+  "https://www.google.com/maps/search/?api=1&query=Design%20and%20Innovation%20Building%2C%20UC%20San%20Diego";
+
+// Stretches a link's hit area to at least 24px tall without moving the layout.
+const LINK_HIT_AREA = "relative before:absolute before:inset-x-0 before:-inset-y-[2px]";
+
+// Tablet and mobile: the date and place rows are themselves the action links.
 function EventDetails({
   date,
   iconClassName = "",
@@ -109,13 +117,28 @@ function EventDetails({
 }) {
   return (
     <div className={`flex flex-col gap-[9px] font-sans text-[16px] leading-none text-white ${className}`}>
-      <p className="flex items-center gap-[8px]">
-        <span className="whitespace-pre underline">{date}</span>
-        <CalendarIcon className={iconClassName} />
+      <p>
+        <a
+          href={CALENDAR_HREF}
+          download
+          aria-label={`${date}, Add to Calendar`}
+          className={`flex w-fit items-center gap-[8px] ${LINK_HIT_AREA}`}
+        >
+          <span className="whitespace-pre underline">{date}</span>
+          <CalendarIcon className={iconClassName} />
+        </a>
       </p>
-      <p className="flex items-center gap-[8px]">
-        <span className="underline">DIB 208</span>
-        <LocationIcon className={iconClassName} />
+      <p>
+        <a
+          href={MAPS_HREF}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="DIB 208, View in Maps"
+          className={`flex w-fit items-center gap-[8px] ${LINK_HIT_AREA}`}
+        >
+          <span className="underline">DIB 208</span>
+          <LocationIcon className={iconClassName} />
+        </a>
       </p>
     </div>
   );
@@ -152,22 +175,20 @@ function LocationIcon({ className = "" }: { className?: string }) {
 }
 
 // Desktop lays the date and place side by side, each with an action link below.
-// TODO: real hrefs for the calendar invite and the map.
 function DesktopEventDetails() {
-  const link =
-    "flex items-center gap-[8px] whitespace-nowrap font-plak text-[14px] underline decoration-from-font [text-underline-position:from-font] opacity-80";
+  const link = `flex items-center gap-[8px] whitespace-nowrap font-plak text-[14px] underline decoration-from-font [text-underline-position:from-font] opacity-80 ${LINK_HIT_AREA}`;
   return (
     <div className="mt-[4px] flex w-full items-center justify-between font-sans text-[16px] leading-[normal] text-white">
       <div className="flex w-[326.505px] flex-col items-start gap-[4px]">
         <p className="whitespace-pre">{"Wednesday, November 18  |  6:30-9:00 PM"}</p>
-        <a href="#" className={link}>
+        <a href={CALENDAR_HREF} download className={link}>
           <CalendarIcon />
           Add to Calendar
         </a>
       </div>
       <div className="flex w-[285.959px] flex-col items-start gap-[4px]">
         <p>DIB 208</p>
-        <a href="#" className={link}>
+        <a href={MAPS_HREF} target="_blank" rel="noopener noreferrer" className={link}>
           <LocationIcon />
           View in Maps
         </a>
