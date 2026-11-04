@@ -143,7 +143,6 @@ function CueArt() {
   return (
     <>
       <rect x="0.0355" y="-0.5" width="0.6455" height="1" fill="#FFDDD0" />
-      <rect x="0.4285" y="-0.5" width="0.002" height="0.25" fill="#FCFFF2" />
       <rect x="0.681" y="-0.5" width="0.0137" height="1" fill="#FFFFFF" />
       <rect x="0.6945" y="-0.5" width="0.3055" height="1" fill="#9E1717" />
       <rect x="0.0055" y="-0.5" width="0.0302" height="1" fill="#FFFFFF" />
