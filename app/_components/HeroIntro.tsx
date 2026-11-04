@@ -214,7 +214,7 @@ export default function HeroIntro({ children }: { children: ReactNode }) {
         // Start the cue's tip just past the viewport's right edge, back along
         // its axis. The cue ball's on-screen width gives px per radius.
         const cue = scope.current.querySelector(".table-cue");
-        const ball = scope.current.querySelector("[data-cue-ball]");
+        const ball = scope.current.querySelector('[data-ball="white"]');
         if (!cue || !ball) return;
         setSlide(0);
         const pxPerRadius = ball.getBoundingClientRect().width / 2;

@@ -159,13 +159,13 @@ body {
   --r: calc(var(--rm) + (var(--rt) - var(--rm)) * var(--p));
 }
 
-/* PoolShot moves the cue ball (and its shadow) from JS: --bx/--bz offset it
-   on the felt and --bh drops it below (world px), --bs scales it, --spin turns
-   its face (deg) and --sq squashes it on impact (0 → 1). */
+/* PoolShot moves the balls (and their shadows) from JS: --bx/--bz offset them
+   on the felt (world px), --bs scales them, --spin turns the face (deg) and
+   --sq squashes them on impact (0 → 1). */
 .table-ball {
   transform: translate(
       calc((var(--x) + var(--bx, 0)) * 1px),
-      calc(((var(--z) + var(--bz, 0)) * var(--s) - (var(--r) + var(--bh, 0)) * var(--c)) * 1px)
+      calc(((var(--z) + var(--bz, 0)) * var(--s) - var(--r) * var(--c)) * 1px)
     )
     scale(calc(var(--r) * var(--bs, 1)));
 }
@@ -202,28 +202,38 @@ body {
     scale(var(--bs, 1));
 }
 
-/* The cue is a 3D segment aimed at the cue ball from the right, at a point
-   0.32 radii above its center: horizontal heading -10.14° off the x axis,
-   butt raised 5.1°. Unit direction tip → butt is (0.98049, -0.17532, 0.08889);
-   it's 792.2 long and its tip sits 2.42 radii out (desktop frame 9026:1631).
+/* The cue is a 3D segment aimed at the cue ball, at a point 0.32 radii above
+   its center, butt raised 5.1° (sin 0.08889, cos 0.99604). (--hx, --hz) is its
+   horizontal direction tip → butt; the defaults are the desktop frame's pose,
+   from the right at -10.14° off the x axis (9026:1631). It's 792.2 long and its
+   tip sits 2.42 radii out. PoolShot re-aims it for the second shot through
+   inline --hx/--hz, --hs (-1 when it points left, keeping the shadow's sides)
+   and --ox/--oz (world px from the ball's start, to where the ball is now).
    --slide (set from JS on the cue and its shadow, in ball radii) pulls it back along
    that axis for the intro and the shot. */
 .table-cue,
 .table-cue-shadow {
+  --hx: 0.98439;
+  --hz: -0.17602;
+  --hs: 1;
+  --ox: 0;
+  --oz: 0;
+  --dx: calc(var(--hx) * 0.99604);
+  --dz: calc(var(--hz) * 0.99604);
   --gap: calc((2.4205 + var(--slide, 0)) * var(--r));
-  --tx: calc(var(--x) + 0.98049 * var(--gap));
-  --tz: calc(var(--z) - 0.17532 * var(--gap));
+  --tx: calc(var(--x) + var(--ox) + var(--dx) * var(--gap));
+  --tz: calc(var(--z) + var(--oz) + var(--dz) * var(--gap));
   --th: calc(1.3198 * var(--r) + 0.08889 * var(--gap));
 }
 
 .table-cue {
-  --dy: calc(-0.17532 * var(--s) - 0.08889 * var(--c));
+  --dy: calc(var(--dz) * var(--s) - 0.08889 * var(--c));
   transform: translate(
       calc(var(--tx) * 1px),
       calc((var(--tz) * var(--s) - var(--th) * var(--c)) * 1px)
     )
-    rotate(atan2(var(--dy), 0.98049))
-    scale(calc(792.2 * hypot(0.98049, var(--dy))), 19);
+    rotate(atan2(var(--dy), var(--dx)))
+    scale(calc(792.2 * hypot(var(--dx), var(--dy))), 19);
 }
 
 /* Shadow of the cue on the felt, cast by the same light as the balls rather
@@ -235,7 +245,7 @@ body {
    toward the butt, starts behind the tip and only peeks out below the cue.
    The axis column is the cue's 792.2 length, butt raised 70.42; the width
    column is the cue's 19px round section projected along the light: its
-   horizontal radius (0.17602, 0.98439, 0) and up radius (-0.0875, 0.01565,
+   horizontal radius (-hz, hx, 0) and up radius (-0.08889 hx, -0.08889 hz,
    0.99606), each measured across the shadow's axis.
    On phones (≤430px, --under = 1, eased in from 500px) the shadow instead sits
    directly under the cue as drawn: a push of (0, -c/s) lines it up with the
@@ -249,8 +259,8 @@ body {
   --lz: calc(
     -1.725 * var(--unsquash) * var(--p) * (1 - var(--under)) - var(--c) / var(--s) * var(--under)
   );
-  --ax: calc(776.74 + 70.42 * var(--lx));
-  --az: calc(-138.89 + 70.42 * var(--lz));
+  --ax: calc(792.2 * var(--dx) + 70.42 * var(--lx));
+  --az: calc(792.2 * var(--dz) + 70.42 * var(--lz));
   --ux: calc(var(--ax) / hypot(var(--ax), var(--az)));
   --uz: calc(var(--az) / hypot(var(--ax), var(--az)));
   /* thickened toward the tablet angle, where the flat camera makes the true
@@ -258,13 +268,21 @@ body {
   --w: calc(
     19 * (1 + 0.75 * var(--p) * (1 - var(--under))) *
       hypot(
-        var(--ux) * 0.98439 - var(--uz) * 0.17602,
-        var(--ux) * (0.01565 + 0.99606 * var(--lz)) - var(--uz) * (-0.0875 + 0.99606 * var(--lx))
+        var(--ux) * var(--hx) + var(--uz) * var(--hz),
+        var(--ux) * (0.99606 * var(--lz) - 0.08889 * var(--hz)) -
+          var(--uz) * (0.99606 * var(--lx) - 0.08889 * var(--hx))
       )
   );
   transform: translate(
-      calc((var(--tx) + var(--th) * var(--lx) - var(--uz) * var(--peek)) * 1px),
-      calc((var(--tz) + var(--th) * var(--lz) + var(--ux) * var(--peek)) * 1px)
+      calc((var(--tx) + var(--th) * var(--lx) - var(--uz) * var(--peek) * var(--hs)) * 1px),
+      calc((var(--tz) + var(--th) * var(--lz) + var(--ux) * var(--peek) * var(--hs)) * 1px)
     )
-    matrix(var(--ax), var(--az), calc(-1 * var(--uz) * var(--w)), calc(var(--ux) * var(--w)), 0, 0);
+    matrix(
+      var(--ax),
+      var(--az),
+      calc(-1 * var(--uz) * var(--w) * var(--hs)),
+      calc(var(--ux) * var(--w) * var(--hs)),
+      0,
+      0
+    );
 }

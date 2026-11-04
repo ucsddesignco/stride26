@@ -69,6 +69,8 @@ const balls: Ball[] = [
 ];
 
 export const cueBall = balls.find((b) => b.kind === "white")!;
+export const blueBall = balls.find((b) => b.kind === "blue")!;
+export const eightBall = balls.find((b) => b.kind === "eight")!;
 
 function ballVars(ball: Ball) {
   const [sa, sb, sc, sd] = ball.shadow.m;
@@ -184,7 +186,7 @@ export default function TableScene() {
             {balls.map((ball) => (
               <circle
                 key={ball.kind}
-                data-cue-ball-shadow={ball === cueBall || undefined}
+                data-ball-shadow={ball.kind}
                 className="table-ball-shadow"
                 style={ballVars(ball)}
                 r="1"
@@ -211,7 +213,7 @@ export default function TableScene() {
             )}
             <g
               aria-hidden
-              data-cue-ball={ball === cueBall || undefined}
+              data-ball={ball.kind}
               className={`table-ball ${ball === cueBall ? "cursor-pointer" : ""}`}
               style={ballVars(ball)}
             >

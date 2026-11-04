@@ -9,35 +9,149 @@ import {
   type MotionValue,
   type ValueAnimationTransition,
 } from "framer-motion";
-import { TABLE_RADIUS, cueBall } from "./TableScene";
+import { TABLE_RADIUS, blueBall, cueBall, eightBall } from "./TableScene";
 
-// Click the cue (or the cue ball) to take the shot. TableScene stays a server
-// component: this wraps it and drives its CSS variables (see .table-cue and
-// .table-ball in globals.css), so the shot follows the camera at every width.
-// Inside HeroIntro it waits until the intro has slid the cue in.
+// Two shots on a table that carries on past the light. Click the cue (or the
+// cue ball): the white ball fades out at the left edge, bounces off a wall
+// nobody can see, fades back in on the top edge and smacks the blue ball, which
+// rolls out of the light while the white ball slows and settles on its spot. The
+// cue then comes in from the left, and a second click does the same to the eight
+// ball, by way of the right edge, before the cue pulls away. Everything holds
+// there until the hero has fully left the viewport, when it's put back unseen so
+// HeroIntro can replay.
+//
+// TableScene stays a server component: this wraps it and drives its CSS
+// variables (see .table-cue and .table-ball in globals.css), so the shots
+// follow the camera at every width. Inside HeroIntro it waits until the intro
+// has slid the cue in.
 
-// Shot heading on the felt: the cue's horizontal direction, toward the tip.
-const DIR_X = -0.98439;
-const DIR_Z = 0.17602;
+type Point = { x: number; z: number };
 
-// Cue travel along its axis in ball radii (+ draws back toward the butt).
-// The tip touches the ball at CONTACT: it's aimed 0.32 radii above center
-// from 2.42 radii out, so it meets the surface 0.95 radii short of that point.
+const unit = (x: number, z: number): Point => {
+  const length = Math.hypot(x, z);
+  return { x: x / length, z: z / length };
+};
+
+// Where the white ball heads on each shot. Each exit is along the cue, and each
+// entry is also the line the struck ball leaves on: a head-on hit sends it
+// straight on, and the white ball follows slowly to the spot it left. The exit
+// and entry don't form a true reflection (the cue's heading can't reach the balls
+// with a real bank), but they read as one, and nobody can see the walls.
+const FIRST_EXIT: Point = { x: -0.98439, z: 0.17602 }; // the cue's rest heading, toward the tip
+const FIRST_ENTRY = unit(0.906, 0.423);
+const FIRST_WALL: Point = { x: -540, z: -120 };
+const SECOND_EXIT = unit(0.995, 0.1); // flat enough that the cue clears the desktop text
+const SECOND_ENTRY = unit(-0.85, -0.53);
+const SECOND_WALL: Point = { x: 525, z: 30 };
+
+// One rolling ball's physics, in world px and seconds. Every speed is worked
+// backward from GONE_SPEED, so the whole path decelerates like one ball.
+const FRICTION = 180; // px/s²
+const BOUNCE_KEEP = 0.85; // share of its speed a ball keeps off a wall
+const GONE_SPEED = 140; // px/s a struck ball still has as it leaves the light
+
+// A ball fades over this much of its path, finishing RIM_PAST beyond the rim.
+// On a short way in, it's solid by ENTRY_FADE_SHARE of the path, so before contact.
+const FADE_BAND = 110;
+const RIM_PAST = 15;
+const ENTRY_FADE_SHARE = 0.75;
+
+// Cue travel along its axis in ball radii (+ draws back toward the butt). It
+// rests TIP_REST radii from the ball's center, aimed 0.32 radii above it, so the
+// tip touches the surface TIP_TOUCH radii out (see strike).
 const DRAWBACK = 0.75;
-const CONTACT = -1.47;
-const FOLLOW_THROUGH = -1.75;
+const TIP_REST = 2.4205;
+const TIP_TOUCH = 0.95;
+const FOLLOW_THROUGH = 0.28;
 const HOVER_NUDGE = 0.18;
+const SQUASH_STRIKE = 1;
+const SQUASH_SMACK = 1.6;
 
-// Ball physics in world px, px/s and px/s².
-const V0 = 460;
-const FRICTION = 300;
-const V_MIN = 220;
-const GRAVITY = 2600;
-const FALL_DEPTH = 600; // drop below the felt that clears the hero
+// At the tilted angles balls are drawn bigger toward the viewer. This is that
+// growth in world px of radius per world px of depth (blue → white in the frame).
+const DEPTH_SLOPE = 0.0176;
+// cos of the tablet camera's elevation, where the perspective sizing is 1
+const COS_TABLET = 0.97347;
+
+const CUE_OFFSCREEN_MARGIN = 40;
+const CUE_ENTER = 1.1;
+const CUE_ENTER_EASE = [0.16, 1, 0.3, 1] as const;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.z - a.z);
+const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
+const smoothstep = (v: number) => {
+  const t = clamp01(v);
+  return t * t * (3 - 2 * t);
+};
+const opposite = ({ x, z }: Point): Point => ({ x: -x, z: -z });
 
-type BallVar = "--bx" | "--bz" | "--bh" | "--bs" | "--spin" | "--sq";
+// Where a ray from `from` along the unit `dir` crosses a circle around the table center.
+function rayToRadius(from: Point, dir: Point, radius: number): Point {
+  const b = from.x * dir.x + from.z * dir.z;
+  const c = from.x * from.x + from.z * from.z - radius * radius;
+  const s = -b + Math.sqrt(Math.max(0, b * b - c));
+  return { x: from.x + dir.x * s, z: from.z + dir.z * s };
+}
+
+// The speed a ball needs at the start of a leg to reach `endSpeed` at its end.
+const speedBefore = (endSpeed: number, length: number) =>
+  Math.sqrt(endSpeed * endSpeed + 2 * FRICTION * length);
+
+type BallVar = "--bx" | "--bz" | "--bs" | "--spin" | "--sq";
+const BALL_VARS: BallVar[] = ["--bx", "--bz", "--bs", "--spin", "--sq"];
+const CUE_VARS = ["--ox", "--oz", "--hx", "--hz", "--hs"];
+
+type BallSpec = typeof cueBall;
+type SceneBall = {
+  spec: BallSpec;
+  el: SVGElement;
+  shadow: SVGElement;
+  x: number;
+  z: number;
+  spin: number;
+};
+
+type Leg = Point & { v0: number; v1: number; fade: "in" | "out" | "dark" | "solid" };
+type Roll = {
+  ball: SceneBall;
+  legs: Leg[];
+  index: number;
+  time: number;
+  from: Point;
+  done: () => void;
+};
+
+// Out to the rim, off a wall in the dark, back in from the rim to contact,
+// arriving at `contactSpeed`. Worked backward so friction and the bounce's loss
+// make one continuous slowdown.
+function bankLegs(
+  start: Point,
+  exit: Point,
+  wall: Point,
+  entry: Point,
+  contact: Point,
+  contactSpeed: number,
+): Leg[] {
+  const atEntry = speedBefore(contactSpeed, distance(entry, contact));
+  const offWall = speedBefore(atEntry, distance(wall, entry));
+  const atWall = offWall / BOUNCE_KEEP;
+  const atExit = speedBefore(atWall, distance(exit, wall));
+  const atStart = speedBefore(atExit, distance(start, exit));
+  return [
+    { ...exit, v0: atStart, v1: atExit, fade: "out" },
+    { ...wall, v0: atExit, v1: atWall, fade: "dark" },
+    { ...entry, v0: offWall, v1: atEntry, fade: "dark" },
+    { ...contact, v0: atEntry, v1: contactSpeed, fade: "in" },
+  ];
+}
+
+const legOpacity = (fade: Leg["fade"], travelled: number, length: number) => {
+  if (fade === "dark") return 0;
+  if (fade === "solid") return 1;
+  if (fade === "out") return smoothstep((length - travelled) / Math.min(FADE_BAND, length));
+  return smoothstep(travelled / Math.min(FADE_BAND, length * ENTRY_FADE_SHARE));
+};
 
 export default function PoolShot({ children }: { children: ReactNode }) {
   const scope = useRef<HTMLDivElement>(null);
@@ -50,32 +164,43 @@ export default function PoolShot({ children }: { children: ReactNode }) {
   useEffect(() => {
     const root = scope.current;
     const cue = root?.querySelector<SVGElement>("[data-pool-cue]");
-    const ball = root?.querySelector<SVGElement>("[data-cue-ball]");
-    const shadow = root?.querySelector<SVGElement>("[data-cue-ball-shadow]");
-    if (!root || !cue || !ball || !shadow) return;
+    const felt = root?.querySelector<SVGElement>(".table-plane > circle");
+    const stageEl = root?.closest("[data-hero-intro]");
+    if (!root || !cue || !felt || !stageEl) return;
     // the cue and its shadow: the only parts that read --slide
     const cueParts = root.querySelectorAll<SVGElement>("[data-hero-cue]");
+    const cueShadow = root.querySelector<SVGElement>("[data-hero-cue]:not([data-pool-cue])");
 
-    let mounted = true;
+    const makeBall = (spec: BallSpec): SceneBall | null => {
+      const el = root.querySelector<SVGElement>(`[data-ball="${spec.kind}"]`);
+      const shadow = root.querySelector<SVGElement>(`[data-ball-shadow="${spec.kind}"]`);
+      return el && shadow ? { spec, el, shadow, x: spec.x, z: spec.z, spin: 0 } : null;
+    };
+    const white = makeBall(cueBall);
+    const blue = makeBall(blueBall);
+    const eight = makeBall(eightBall);
+    if (!white || !blue || !eight) return;
+    const movingBalls = [white, blue, eight];
+
+    let stage: "first" | "second" | "done" = "first";
+    const isDone = () => stage === "done";
     let busy = false;
+    // bumped by a reset: a shot still awaiting something sees it and gives up
+    let shotId = 0;
     let raf: number | null = null;
+    let lastFrame = 0;
+    let stopWatch: (() => void) | null = null;
+    const rolls = new Set<Roll>();
     const running: AnimationPlaybackControls[] = [];
     let hoverAnim: AnimationPlaybackControls | null = null;
 
     // cue: shot travel + hover nudge, both along the cue axis
     const shot = motionValue(0);
     const hover = motionValue(0);
-    const setSlide = () => {
-      const slide = String(shot.get() + hover.get());
-      cueParts.forEach((el) => el.style.setProperty("--slide", slide));
-    };
+    const writeSlide = (slide: number) =>
+      cueParts.forEach((el) => el.style.setProperty("--slide", String(slide)));
+    const setSlide = () => writeSlide(shot.get() + hover.get());
     const unsubscribe = [shot.on("change", setSlide), hover.on("change", setSlide)];
-
-    const setBall = (name: BallVar, v: number) => {
-      ball.style.setProperty(name, String(v));
-      shadow.style.setProperty(name, String(v));
-    };
-    const setOpacity = (el: SVGElement, v: number) => (el.style.opacity = String(v));
 
     const run = (
       value: MotionValue<number>,
@@ -94,114 +219,345 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       set: (v: number) => void,
     ) => run(motionValue(from), to, { ...options, onUpdate: set });
 
-    // Roll along the heading with friction, then drop off the rim under gravity.
-    const rollBall = () =>
-      new Promise<void>((resolve) => {
-        let s = 0;
-        let v = V0;
-        let fallV = 0;
-        let drop = 0;
-        let falling = false;
-        let last = performance.now();
+    // The camera follows the viewport width, so read it from the felt's drawn
+    // size: table scale (px per world px) and perspective sizing (see --p).
+    const measure = () => {
+      const rect = felt.getBoundingClientRect();
+      const s = rect.height / rect.width;
+      return {
+        scale: rect.width / (2 * TABLE_RADIUS),
+        perspective: Math.sqrt(Math.max(0, 1 - s * s)) / COS_TABLET,
+      };
+    };
+    let view = measure();
 
-        const tick = (now: number) => {
-          const dt = Math.min((now - last) / 1000, 1 / 30);
-          last = now;
+    const baseRadius = ({ rTablet, rMobile }: BallSpec) =>
+      rMobile + (rTablet - rMobile) * view.perspective;
+    const radiusAt = (spec: BallSpec, z: number) =>
+      Math.max(
+        baseRadius(spec) * 0.5,
+        baseRadius(spec) + view.perspective * DEPTH_SLOPE * (z - spec.z),
+      );
 
-          if (!falling) v = Math.max(v - FRICTION * dt, V_MIN);
-          s += v * dt; // speed carries over the edge; also drives spin
-          setBall("--bx", s * DIR_X);
-          setBall("--bz", s * DIR_Z);
-          setBall("--spin", (-s / cueBall.rTablet) * (180 / Math.PI));
+    const setBall = (ball: SceneBall, name: BallVar, v: number) => {
+      ball.el.style.setProperty(name, String(v));
+      ball.shadow.style.setProperty(name, String(v));
+    };
+    const setBallOpacity = (ball: SceneBall, v: number) => {
+      ball.el.style.opacity = String(v);
+      ball.shadow.style.opacity = String(v);
+    };
 
-          if (!falling && Math.hypot(cueBall.x + s * DIR_X, cueBall.z + s * DIR_Z) >= TABLE_RADIUS) {
-            falling = true;
-            // seen top-down a drop doesn't move on screen, so it also shrinks and fades
-            tween(1, 0, { duration: 0.2, ease: "easeOut" }, (o) => setOpacity(shadow, o));
-            tween(1, 0.6, { duration: 0.45, ease: "easeIn" }, (b) => setBall("--bs", b));
-            tween(1, 0, { duration: 0.45, ease: "easeIn" }, (o) => setOpacity(ball, o));
-          }
-          if (falling) {
-            fallV += GRAVITY * dt;
-            drop += fallV * dt;
-            setBall("--bh", -drop);
-          }
+    const placeBall = ({ x, z }: Point, ball: SceneBall) => {
+      const radius = radiusAt(ball.spec, z);
+      const rolled = Math.hypot(x - ball.x, z - ball.z);
+      ball.spin += (Math.sign(x - ball.x) || 1) * (rolled / radius) * (180 / Math.PI);
+      ball.x = x;
+      ball.z = z;
+      setBall(ball, "--bx", x - ball.spec.x);
+      setBall(ball, "--bz", z - ball.spec.z);
+      setBall(ball, "--bs", radius / baseRadius(ball.spec));
+      setBall(ball, "--spin", ball.spin);
+    };
 
-          if (drop > FALL_DEPTH) {
-            raf = null;
-            resolve();
-            return;
-          }
+    const putAway = (ball: SceneBall) => {
+      ball.el.style.visibility = "hidden";
+      ball.shadow.style.visibility = "hidden";
+    };
+
+    const advance = (roll: Roll, dt: number) => {
+      roll.time += dt;
+      for (;;) {
+        const leg = roll.legs[roll.index];
+        const length = distance(roll.from, leg);
+        const duration = (2 * length) / (leg.v0 + leg.v1);
+        if (roll.time < duration) {
+          const t = roll.time;
+          const s = leg.v0 * t + ((leg.v1 - leg.v0) / (2 * duration)) * t * t;
+          const f = s / length;
+          placeBall(
+            { x: roll.from.x + (leg.x - roll.from.x) * f, z: roll.from.z + (leg.z - roll.from.z) * f },
+            roll.ball,
+          );
+          setBallOpacity(roll.ball, legOpacity(leg.fade, s, length));
+          return;
+        }
+        roll.time -= duration;
+        roll.from = { x: leg.x, z: leg.z };
+        roll.index += 1;
+        if (roll.index === roll.legs.length) {
+          placeBall(roll.from, roll.ball);
+          setBallOpacity(roll.ball, legOpacity(leg.fade, length, length));
+          rolls.delete(roll);
+          roll.done();
+          return;
+        }
+      }
+    };
+
+    // One loop for every rolling ball, running only while one is.
+    const tick = (now: number) => {
+      const dt = Math.min((now - lastFrame) / 1000, 1 / 30);
+      lastFrame = now;
+      rolls.forEach((roll) => advance(roll, dt));
+      raf = rolls.size > 0 ? requestAnimationFrame(tick) : null;
+    };
+
+    const roll = (ball: SceneBall, legs: Leg[]) =>
+      new Promise<void>((done) => {
+        rolls.add({ ball, legs, index: 0, time: 0, from: { x: ball.x, z: ball.z }, done });
+        if (raf === null) {
+          lastFrame = performance.now();
           raf = requestAnimationFrame(tick);
-        };
-
-        raf = requestAnimationFrame(tick);
+        }
       });
 
-    const respawnBall = async () => {
-      (["--bx", "--bz", "--bh", "--spin", "--sq"] as const).forEach((name) => setBall(name, 0));
-      setBall("--bs", 0.85);
-      setOpacity(ball, 0);
-      tween(0, 1, { duration: 0.35, ease: "easeOut" }, (o) => setOpacity(shadow, o));
-      tween(0, 1, { duration: 0.3, ease: "easeOut" }, (o) => setOpacity(ball, o));
-      await tween(0.85, 1, { type: "spring", stiffness: 260, damping: 18 }, (b) => setBall("--bs", b));
+    const squash = (ball: SceneBall, amount: number) =>
+      tween(0, [0, amount, 0], { duration: 0.14, times: [0, 0.5, 1] }, (q) =>
+        setBall(ball, "--sq", q),
+      );
+
+    // Where the white ball touches `target` on its way in along `entryDir`.
+    const contactPoint = (target: SceneBall, entryDir: Point): Point => {
+      const reach = radiusAt(cueBall, target.spec.z) + baseRadius(target.spec);
+      return { x: target.x - entryDir.x * reach, z: target.z - entryDir.z * reach };
+    };
+
+    // Draw back, hold, strike. `onHit` fires the frame the tip reaches the ball,
+    // which is drawn smaller farther from the viewer, so the tip travels further.
+    const strike = async (id: number, onHit: () => void) => {
+      const ballScale = radiusAt(cueBall, white.z) / baseRadius(cueBall);
+      const touch = TIP_TOUCH * ballScale - TIP_REST;
+
+      await run(shot, DRAWBACK, { duration: 0.42, ease: [0.33, 0, 0.2, 1] });
+      await sleep(90);
+      if (id !== shotId) return false;
+
+      let hit = false;
+      stopWatch = shot.on("change", (s) => {
+        if (hit || s > touch) return;
+        hit = true;
+        onHit();
+      });
+      await run(shot, touch - FOLLOW_THROUGH, { duration: 0.12, ease: [0.55, 0, 1, 0.6] });
+      stopWatch?.();
+      stopWatch = null;
+      if (id !== shotId) return false;
+
+      // follow-through hold
+      await sleep(180);
+      return id === shotId;
+    };
+
+    // The cue strikes and the white ball banks round through the dark into `target`.
+    // `target` rolls on along the same line out of the light, and the white ball
+    // follows slowly, stopping on the spot `target` left. `settled` resolves with
+    // both balls at rest, or early if `id` goes stale.
+    const bankShot = (
+      id: number,
+      target: SceneBall,
+      exitDir: Point,
+      entryDir: Point,
+      wall: Point,
+    ) => {
+      const contact = contactPoint(target, entryDir);
+      const targetEnd = rayToRadius(target, entryDir, TABLE_RADIUS + RIM_PAST);
+      const contactSpeed = speedBefore(GONE_SPEED, distance(target, targetEnd));
+      const legs = bankLegs(
+        { x: white.x, z: white.z },
+        rayToRadius(white, exitDir, TABLE_RADIUS + RIM_PAST),
+        wall,
+        rayToRadius(contact, opposite(entryDir), TABLE_RADIUS + RIM_PAST),
+        contact,
+        contactSpeed,
+      );
+
+      let settled: Promise<void> = Promise.resolve();
+      const struck = strike(id, () => {
+        squash(white, SQUASH_STRIKE);
+        settled = (async () => {
+          await roll(white, legs);
+          if (id !== shotId) return;
+          squash(white, SQUASH_SMACK);
+          squash(target, SQUASH_SMACK);
+          const { x, z } = target.spec;
+          const follow = speedBefore(0, distance(contact, target.spec));
+          await Promise.all([
+            roll(target, [{ ...targetEnd, v0: contactSpeed, v1: GONE_SPEED, fade: "out" }]),
+            roll(white, [{ x, z, v0: follow, v1: 0, fade: "solid" }]),
+          ]);
+          if (id === shotId) putAway(target);
+        })();
+      });
+      return { struck, settled: () => settled };
+    };
+
+    // Horizontal screen px per unit of --slide, for the cue's current heading.
+    const cueScreenRate = (hx: number) =>
+      baseRadius(cueBall) * view.scale * Math.abs(hx) * 0.99604;
+
+    // Re-aims the cue at the white ball from the left, so a hit sends the ball
+    // along `heading`. Returns the slide that starts it just past the viewport's
+    // left edge. It's off-screen when this runs, so the jump never shows.
+    const aimCueFromLeft = (heading: Point) => {
+      const { x: hx, z: hz } = opposite(heading);
+      cueParts.forEach((el) => {
+        el.style.setProperty("--ox", String(white.x - cueBall.x));
+        el.style.setProperty("--oz", String(white.z - cueBall.z));
+        el.style.setProperty("--hx", String(hx));
+        el.style.setProperty("--hz", String(hz));
+        el.style.setProperty("--hs", "-1");
+      });
+      // up here its shadow falls past the back rim, leaving only a speck on the felt
+      if (cueShadow) cueShadow.style.visibility = "hidden";
+      writeSlide(0);
+      const tipEdge = cue.getBoundingClientRect().right;
+      return (tipEdge + CUE_OFFSCREEN_MARGIN) / cueScreenRate(hx);
+    };
+
+    // Pulls the cue back along its axis until its tip clears the viewport, on the
+    // side away from `heading`, the way it just sent the ball.
+    const pullCueAway = (heading: Point) => {
+      const rect = cue.getBoundingClientRect();
+      const tipToEdge =
+        heading.x < 0 ? window.innerWidth - rect.left : rect.right;
+      const clear = (tipToEdge + CUE_OFFSCREEN_MARGIN) / cueScreenRate(heading.x);
+      return run(shot, shot.get() + clear, { duration: 0.6, ease: [0.4, 0, 1, 1] });
+    };
+
+    const firstShot = async (id: number) => {
+      const { struck, settled } = bankShot(id, blue, FIRST_EXIT, FIRST_ENTRY, FIRST_WALL);
+      if (!(await struck)) return;
+
+      const cueGone = pullCueAway(FIRST_EXIT);
+      await Promise.all([settled(), cueGone]);
+      if (id !== shotId) return;
+
+      // It comes back in from the left and sets up on the white ball.
+      shot.jump(aimCueFromLeft(SECOND_EXIT));
+      await run(shot, 0, { duration: CUE_ENTER, ease: CUE_ENTER_EASE });
+      if (id === shotId) stage = "second";
+    };
+
+    const secondShot = async (id: number) => {
+      const { struck, settled } = bankShot(id, eight, SECOND_EXIT, SECOND_ENTRY, SECOND_WALL);
+      if (!(await struck)) return;
+
+      const cueGone = pullCueAway(SECOND_EXIT);
+      await Promise.all([settled(), cueGone]);
+      if (id === shotId) stage = "done";
+    };
+
+    // Reduced motion: nothing rolls. A small cue nudge, then parts cross-fade
+    // to where the full version leaves them.
+    const nudgeCue = async () => {
+      await run(shot, -0.25, { duration: 0.12 });
+      run(shot, 0, { duration: 0.2 });
+    };
+    const fadeBall = (ball: SceneBall, from: number, to: number) =>
+      tween(from, to, { duration: 0.3 }, (o) => setBallOpacity(ball, o));
+
+    const fadeCue = (from: number, to: number) =>
+      tween(from, to, { duration: 0.3 }, (o) =>
+        cueParts.forEach((el) => (el.style.opacity = String(o))),
+      );
+
+    const firstShotReduced = async (id: number) => {
+      await nudgeCue();
+      await Promise.all([fadeBall(blue, 1, 0), fadeBall(white, 1, 0), fadeCue(1, 0)]);
+      if (id !== shotId) return;
+      putAway(blue);
+      placeBall(blueBall, white);
+      setBallOpacity(white, 0);
+      aimCueFromLeft(SECOND_EXIT);
+      await Promise.all([fadeBall(white, 0, 1), fadeCue(0, 1)]);
+      if (id === shotId) stage = "second";
+    };
+
+    const secondShotReduced = async (id: number) => {
+      await nudgeCue();
+      await Promise.all([fadeBall(eight, 1, 0), fadeBall(white, 1, 0), fadeCue(1, 0)]);
+      if (id !== shotId) return;
+      putAway(eight);
+      placeBall(eightBall, white);
+      setBallOpacity(white, 0);
+      await fadeBall(white, 0, 1);
+      if (id === shotId) stage = "done";
+    };
+
+    const setFinished = (finished: boolean) => {
+      for (const el of [cue, white.el]) el.style.cursor = finished ? "default" : "";
+      cue.tabIndex = finished ? -1 : 0;
+      if (finished) cue.setAttribute("aria-disabled", "true");
+      else cue.removeAttribute("aria-disabled");
     };
 
     // The intro slides the cue in first; until then it's hidden.
     const ready = () => !root.closest("[data-hero-intro]:not([data-hero-ready])");
 
     const shoot = async () => {
-      if (busy || !ready()) return;
+      if (busy || stage === "done" || !ready()) return;
       busy = true;
+      const id = shotId;
+      hoverAnim?.stop();
       run(hover, 0, { duration: 0.15 });
+      view = measure();
 
-      if (reduceRef.current) {
-        await run(shot, -0.25, { duration: 0.12 });
-        run(shot, 0, { duration: 0.2 });
-        await tween(1, 0, { duration: 0.3 }, (o) => {
-          setOpacity(ball, o);
-          setOpacity(shadow, o);
-        });
-        await sleep(400);
-        if (!mounted) return;
-        await respawnBall();
+      if (stage === "first") {
+        await (reduceRef.current ? firstShotReduced(id) : firstShot(id));
       } else {
-        // drawback + hold
-        await run(shot, DRAWBACK, { duration: 0.42, ease: [0.33, 0, 0.2, 1] });
-        await sleep(90);
-        if (!mounted) return;
-
-        // strike: the ball launches the frame the tip reaches it
-        let ballDone: Promise<void> = Promise.resolve();
-        let hit = false;
-        const stopWatch = shot.on("change", (s) => {
-          if (hit || s > CONTACT) return;
-          hit = true;
-          tween(0, [0, 1, 0], { duration: 0.14, times: [0, 0.5, 1] }, (q) => setBall("--sq", q));
-          ballDone = rollBall();
-        });
-        await run(shot, FOLLOW_THROUGH, { duration: 0.12, ease: [0.55, 0, 1, 0.6] });
-        stopWatch();
-
-        // follow-through hold, then the cue eases back to rest
-        await sleep(180);
-        if (!mounted) return;
-        const cueBack = run(shot, 0, { duration: 0.7, ease: [0.4, 0, 0.2, 1] });
-
-        await Promise.all([ballDone, cueBack]);
-        await sleep(500);
-        if (!mounted) return;
-        await respawnBall();
+        await (reduceRef.current ? secondShotReduced(id) : secondShot(id));
       }
+      if (id !== shotId) return;
 
       running.length = 0;
       busy = false;
+      setFinished(isDone());
     };
+
+    // Stops everything and restores the starting poses. Only runs while the
+    // hero is fully out of view, so it's never seen.
+    const stopAll = () => {
+      shotId += 1;
+      if (raf !== null) cancelAnimationFrame(raf);
+      raf = null;
+      rolls.clear();
+      stopWatch?.();
+      stopWatch = null;
+      running.forEach((c) => c.stop());
+      running.length = 0;
+      hoverAnim?.stop();
+    };
+    const reset = () => {
+      stopAll();
+      busy = false;
+      stage = "first";
+      shot.jump(0);
+      hover.jump(0);
+      movingBalls.forEach((ball) => {
+        ball.x = ball.spec.x;
+        ball.z = ball.spec.z;
+        ball.spin = 0;
+        for (const el of [ball.el, ball.shadow]) {
+          BALL_VARS.forEach((name) => el.style.removeProperty(name));
+          el.style.removeProperty("opacity");
+          el.style.removeProperty("visibility");
+        }
+      });
+      cueParts.forEach((el) => CUE_VARS.forEach((name) => el.style.removeProperty(name)));
+      cueShadow?.style.removeProperty("visibility");
+      setFinished(false);
+    };
+
+    const offscreen = new IntersectionObserver((entries) => {
+      if (!entries[entries.length - 1].isIntersecting) reset();
+    });
+    offscreen.observe(stageEl);
 
     // Hover springs live outside `running`, which is only cleared after a
     // shot, so hovering without shooting doesn't pile up controls.
     const nudge = (to: number) => {
-      if (busy || !ready()) return;
+      if (busy || stage === "done" || !ready()) return;
       hoverAnim?.stop();
       hoverAnim = animate(hover, to, { type: "spring", stiffness: 300, damping: 20 });
     };
@@ -213,7 +569,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     const onEnter = () => nudge(HOVER_NUDGE);
     const onLeave = () => nudge(0);
 
-    for (const el of [cue, ball]) {
+    for (const el of [cue, white.el]) {
       el.addEventListener("click", shoot);
       el.addEventListener("pointerenter", onEnter);
       el.addEventListener("pointerleave", onLeave);
@@ -221,12 +577,10 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     cue.addEventListener("keydown", onKey);
 
     return () => {
-      mounted = false;
-      if (raf !== null) cancelAnimationFrame(raf);
-      running.forEach((c) => c.stop());
-      hoverAnim?.stop();
+      offscreen.disconnect();
+      stopAll();
       unsubscribe.forEach((u) => u());
-      for (const el of [cue, ball]) {
+      for (const el of [cue, white.el]) {
         el.removeEventListener("click", shoot);
         el.removeEventListener("pointerenter", onEnter);
         el.removeEventListener("pointerleave", onLeave);
