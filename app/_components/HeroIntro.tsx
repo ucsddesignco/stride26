@@ -117,7 +117,9 @@ export default function HeroIntro({ children }: { children: ReactNode }) {
     const el = scope.current;
     if (!el) return;
     const io = new IntersectionObserver(
-      ([entry]) => {
+      (entries) => {
+        // a quick jump away and back arrives as one batch: the newest entry is the truth
+        const entry = entries[entries.length - 1];
         // the reported ratio can land just under the threshold it crossed
         if (entry.isIntersecting && entry.intersectionRatio >= START_AMOUNT - 0.01) setInView(true);
         else if (!entry.isIntersecting) setInView(false);
