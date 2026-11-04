@@ -1,0 +1,109 @@
+name: Design feedback
+description: Report a visual or UX problem you spotted on a Stride preview or the live site.
+title: "[Design]: "
+labels: ["design-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reviewing Stride! Please file **one issue per problem** so devs can fix and close each one separately.
+        Not sure how to fill this out? See the design feedback guide shared in the DCo dev/design channel.
+
+  - type: input
+    id: preview-link
+    attributes:
+      label: Preview link
+      description: |
+        The link you were looking at. If possible, use the deploy's permalink (the long URL starting with a string of letters and numbers) so we see the exact version you saw.
+      placeholder: "https://deploy-preview-12--<project-name>.netlify.app/  or  https://stride26.designatucsd.com/"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: section
+    attributes:
+      label: Page / section
+      description: Where on the site is the problem?
+      options:
+        - Hero
+        - Navigation / header
+        - Footer
+        - Other section (describe below)
+        - Whole page / site-wide
+    validations:
+      required: true
+
+  - type: input
+    id: section-other
+    attributes:
+      label: Section details (optional)
+      description: If you picked "Other section," or want to be more specific, describe where it is.
+      placeholder: "e.g. second card in the events grid"
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device type
+      options:
+        - Phone
+        - Tablet
+        - Laptop / desktop
+    validations:
+      required: true
+
+  - type: input
+    id: device-browser
+    attributes:
+      label: Device model + browser
+      description: Many layout bugs only happen on certain screen sizes or browsers.
+      placeholder: "e.g. iPhone 15, Safari  /  MacBook Air 13\", Chrome"
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What's wrong
+      description: Describe what you see right now.
+      placeholder: "e.g. The CTA button overlaps the headline text when the screen is narrow."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should look like
+      description: Describe the intended design. Link the Figma frame if there is one.
+      placeholder: "e.g. Button sits 24px below the headline, centered. Figma: https://www.figma.com/design/..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshot or screen recording
+      description: Drag and drop images or videos here. Circle or annotate the problem if you can.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: How important is this?
+      description: Your best guess. A dev will confirm during triage.
+      options:
+        - "Blocker: broken, unreadable, or unusable"
+        - "Should fix: noticeably off from the design"
+        - "Nice to have: small polish"
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched open issues and this hasn't been reported yet.
+          required: true
+        - label: This issue covers only one problem.
+          required: true
