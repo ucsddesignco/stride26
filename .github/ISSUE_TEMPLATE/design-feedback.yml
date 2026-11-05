@@ -6,8 +6,8 @@ body:
   - type: markdown
     attributes:
       value: |
-        Thanks for reviewing Stride! Please file **one issue per problem** so devs can fix and close each one separately.
-        Not sure how to fill this out? See the design feedback guide shared in the DCo dev/design channel.
+        Please file **one issue per problem** so devs can fix and close each one separately.
+        Not sure how to fill this out? See the [design feedback guide](https://docs.google.com/document/d/1OcCKBbxZpYFRrVPeDWFhj2oIATd-0yfu0elkR5o5Ljc/edit?usp=sharing)
 
   - type: input
     id: preview-link
