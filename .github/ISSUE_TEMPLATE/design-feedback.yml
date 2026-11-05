@@ -14,8 +14,16 @@ body:
     attributes:
       label: Preview link
       description: |
-        The link you were looking at. If possible, use the deploy's permalink (the long URL starting with a string of letters and numbers) so we see the exact version you saw.
+        The preview link you used to see the bug. 
       placeholder: "https://deploy-preview-12--<project-name>.netlify.app/  or  https://stride26.designatucsd.com/"
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshot or screen recording
+      description: Drag and drop images or videos here. Circle or annotate the problem if you can.
     validations:
       required: true
 
@@ -78,32 +86,14 @@ body:
     validations:
       required: true
 
-  - type: textarea
-    id: screenshots
-    attributes:
-      label: Screenshot or screen recording
-      description: Drag and drop images or videos here. Circle or annotate the problem if you can.
-    validations:
-      required: true
-
   - type: dropdown
     id: priority
     attributes:
-      label: How important is this?
-      description: Your best guess. A dev will confirm during triage.
+      label: Fix priority?
+      description: Your best guess will do.
       options:
         - "Blocker: broken, unreadable, or unusable"
         - "Should fix: noticeably off from the design"
         - "Nice to have: small polish"
     validations:
       required: true
-
-  - type: checkboxes
-    id: checks
-    attributes:
-      label: Before submitting
-      options:
-        - label: I searched open issues and this hasn't been reported yet.
-          required: true
-        - label: This issue covers only one problem.
-          required: true
