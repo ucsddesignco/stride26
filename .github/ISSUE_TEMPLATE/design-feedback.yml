@@ -1,0 +1,98 @@
+name: Design feedback
+description: Report a visual or UX problem you spotted on a Stride preview or the live site.
+title: "[Design]: "
+labels: ["design-feedback"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please file **one issue per problem** so devs can fix and close each one separately.
+        Not sure how to fill this out? See the [design feedback guide](https://docs.google.com/document/d/1OcCKBbxZpYFRrVPeDWFhj2oIATd-0yfu0elkR5o5Ljc/edit?usp=sharing)
+
+  - type: input
+    id: preview-link
+    attributes:
+      label: Preview link
+      description: |
+        The preview link you used to see the bug. 
+      placeholder: "https://deploy-preview-12--<project-name>.netlify.app/  or  https://stride26.designatucsd.com/"
+    validations:
+      required: true
+
+  - type: textarea
+    id: screenshots
+    attributes:
+      label: Screenshot or screen recording
+      description: Drag and drop images or videos here. Circle or annotate the problem if you can.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: section
+    attributes:
+      label: Page / section
+      description: Where on the site is the problem?
+      options:
+        - Hero
+        - Navigation / header
+        - Footer
+        - Other section (describe below)
+        - Whole page / site-wide
+    validations:
+      required: true
+
+  - type: input
+    id: section-other
+    attributes:
+      label: Section details (optional)
+      description: If you picked "Other section," or want to be more specific, describe where it is.
+      placeholder: "e.g. second card in the events grid"
+
+  - type: dropdown
+    id: device
+    attributes:
+      label: Device type
+      options:
+        - Phone
+        - Tablet
+        - Laptop / desktop
+    validations:
+      required: true
+
+  - type: input
+    id: screen-width
+    attributes:
+      label: Screen width (px)
+      description: The width of the browser window where you saw the problem. Check it in dev tools, or open [whatismyviewport.com](https://whatismyviewport.com) in the same window.
+      placeholder: "e.g. 390"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: browser
+    attributes:
+      label: Browser
+      options:
+        - Chrome
+        - Safari
+        - Firefox
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What's wrong
+      description: Describe what you see right now.
+      placeholder: "e.g. The CTA button overlaps the headline text when the screen is narrow."
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What it should look like
+      description: Describe the intended design. Link the Figma frame if there is one.
+      placeholder: "e.g. Button sits 24px below the headline, centered. Figma: https://www.figma.com/design/..."
+    validations:
+      required: true
