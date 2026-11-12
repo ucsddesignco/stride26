@@ -25,24 +25,6 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-.responsive-footer-background {
-  background-image: url("/footer.png");
-  background-position: center;
-  background-size: cover;
-}
-
-@media (max-width: 389px) {
-  .responsive-footer-background {
-    background-image: url("/footer-mobile.png"), url("/footer.png");
-  }
-}
-
-@media (min-width: 390px) and (max-width: 1279px) {
-  .responsive-footer-background {
-    background-image: url("/footer-tablet.png"), url("/footer.png");
-  }
-}
-
 html {
   scroll-behavior: smooth;
 }

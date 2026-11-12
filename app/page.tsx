@@ -8,7 +8,7 @@ import SiteNav from "./Components/SiteNav";
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-black text-white">
+    <div className="min-h-screen overflow-x-hidden bg-black text-white">
       <SiteNav />
       <HeroSection />
       <AboutSection />
