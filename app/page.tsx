@@ -1,6 +1,6 @@
-import { ChevronLeft, ChevronRight } from "lucide-react";
 import FAQ from "./Components/FAQ";
 import ArrowIcon from "./Components/ArrowIcon";
+import AttendingProfessionals from "./Components/AttendingProfessionals";
 
 export default function Home() {
   return (
@@ -69,7 +69,7 @@ export default function Home() {
         id="agenda"
         className="pb-30 px-30 max-w-7xl mx-auto bg-gray-50/50 rounded-3xl my-12"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+        <div className="grid grid-cols-1 items-center lg:grid-cols-2 lg:gap-12">
           <div className="space-y-6">
             <h2 className="text-3xl font-display text-gray-900">Agenda</h2>
             <div className="py-2 px-4 m-0 flex bg-black text-white font-sans justify-between text-sm">
@@ -93,41 +93,25 @@ export default function Home() {
               <p className="text-2xl">Doors Close</p>
             </div>
           </div>
-          <div className="w-full h-full bg-gray-100 rounded-md"></div>
+          <div className="hidden h-full w-full rounded-md bg-gray-100 lg:block"></div>
         </div>
       </section>
 
       {/* judges */}
-      <section className="pb-30 px-30 max-w-7xl mx-auto bg-gray-50/50 rounded-3xl my-12">
-        <div className="flex flex-col gap-5">
-          <h2 className="text-3xl font-display text-gray-900">(Judges)</h2>
-          <div className="flex w-full gap-6 justify-center items-center">
-            <ChevronLeft></ChevronLeft>
-            <div className="flex w-full justify-between gap-8">
-              <div className="w-full flex flex-col gap-4">
-                <div className="bg-gray-200 w-full h-[220px] rounded-md font-sans"></div>
-                <p className="text-lg font-sans leading-1">First Last</p>
-                <p className="font-sans leading-1 text-sm">Role @ Company</p>
-              </div>
-              <div className="w-full flex flex-col gap-4">
-                <div className="bg-gray-200 w-full h-[220px] rounded-md font-sans"></div>
-                <p className="text-lg font-sans leading-1">First Last</p>
-                <p className="font-sans leading-1 text-sm">Role @ Company</p>
-              </div>
-              <div className="w-full flex flex-col gap-4">
-                <div className="bg-gray-200 w-full h-[220px] rounded-md font-sans"></div>
-                <p className="text-lg font-sans leading-1">First Last</p>
-                <p className="font-sans leading-1 text-sm">Role @ Company</p>
-              </div>
-              <div className="w-full flex flex-col gap-4">
-                <div className="bg-gray-200 w-full h-[220px] rounded-md font-sans"></div>
-                <p className="text-lg font-sans leading-1">First Last</p>
-                <p className="font-sans leading-1 text-sm">Role @ Company</p>
-              </div>
-            </div>
-            <ChevronRight></ChevronRight>
-          </div>
+      <section className="overflow-x-clip bg-black py-20 text-white">
+        <div
+          className="mx-auto max-w-7xl"
+          style={{
+            paddingInline:
+              "clamp(2.5rem, calc(2.5rem + (100vw - 24.375rem) * 0.126183), 7.5rem)",
+          }}
+        >
+          <h2 className="text-left font-display text-3xl">
+            <span className="block md:inline">Attending</span>{" "}
+            <span className="block md:inline">Professionals</span>
+          </h2>
         </div>
+        <AttendingProfessionals />
       </section>
 
       {/* faq */}
