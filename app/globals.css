@@ -40,10 +40,20 @@ body {
    From the desktop breakpoint (1024px) down to the tablet frame (744px), --u
    runs 1 → 0; below that, down to the mobile frame (390px), --t runs 0 → 1.
    The pool table and the hero text interpolate between their frames on these,
-   so they move continuously with width and no JS. */
+   so they move continuously with width and no JS.
+   The width goes through --hero-vw, a registered length, so atan2() below is
+   handed plain px: Safari 26.5 returns 0 for atan2() on vw (or any relative
+   unit), which left the hero in its mobile pose at every width. */
+@property --hero-vw {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
 .hero-fluid {
+  --hero-vw: 100vw;
   /* viewport width as a plain number (length ÷ length via atan2) */
-  --viewport: tan(atan2(100vw, 1px));
+  --viewport: tan(atan2(var(--hero-vw), 1px));
   --t: clamp(0, (744 - var(--viewport)) / 354, 1);
   --u: clamp(0, (var(--viewport) - 744) / 280, 1);
   /* lets the mobile wordmark fit the section's real width (cqw), scrollbar-safe */
