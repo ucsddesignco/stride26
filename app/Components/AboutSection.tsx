@@ -28,7 +28,7 @@ export default function AboutSection() {
   return (
     <section
       id="about"
-      className="py-16 min-[744px]:py-24 min-[1280px]:py-30 max-w-7xl mx-auto px-6 min-[390px]:px-8 min-[744px]:px-12 min-[1280px]:px-30"
+      className="py-16 min-[744px]:py-24 min-[1280px]:py-30 max-w-7xl mx-auto px-10 min-[744px]:px-20 min-[1280px]:px-30"
     >
       <div className="grid grid-cols-1 min-[1280px]:grid-cols-2 gap-8 min-[744px]:gap-12 items-center">
         <div>
