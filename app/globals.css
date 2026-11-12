@@ -8,16 +8,27 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-cream: #fcfff2;
   --font-sans: var(--font-nb-international), sans-serif;
   --font-display: var(--font-neue-plak), sans-serif;
-}
+  --font-plak: var(--font-neue-plak-regular), sans-serif;
+  /* Hero stars. Hero.tsx sets each star's own duration and delay inline. */
+  --animate-star-spin: star-spin 12.5s linear infinite;
+  /* One way only: `alternate` grows the star back, so a full loop is twice this. */
+  --animate-star-twinkle: star-twinkle 4s ease-in-out infinite alternate;
 
-/* @media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+  @keyframes star-spin {
+    to {
+      rotate: 360deg;
+    }
   }
-} */
+
+  @keyframes star-twinkle {
+    to {
+      scale: 0;
+    }
+  }
+}
 
 body {
   background: var(--background);
@@ -25,12 +36,305 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-html {
-  scroll-behavior: smooth;
+/* ─── Hero blend factors (set on the hero <section>, see Hero.tsx) ──────────
+   From the desktop breakpoint (1024px) down to the tablet frame (744px), --u
+   runs 1 → 0; below that, down to the mobile frame (390px), --t runs 0 → 1.
+   The pool table and the hero text interpolate between their frames on these,
+   so they move continuously with width and no JS.
+   The width goes through --hero-vw, a registered length, so atan2() below is
+   handed plain px: Safari 26.5 returns 0 for atan2() on vw (or any relative
+   unit), which left the hero in its mobile pose at every width. */
+@property --hero-vw {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
+.hero-fluid {
+  --hero-vw: 100vw;
+  /* viewport width as a plain number (length ÷ length via atan2) */
+  --viewport: tan(atan2(var(--hero-vw), 1px));
+  --t: clamp(0, (744 - var(--viewport)) / 354, 1);
+  --u: clamp(0, (var(--viewport) - 744) / 280, 1);
+  /* lets the mobile wordmark fit the section's real width (cqw), scrollbar-safe */
+  container-type: inline-size;
+}
+
+/* Hero text (see Hero.tsx): keyframes desktop left 110 / top 115 (≥1024px),
+   tablet 75 / 124 (744px), mobile centered with 44px sides and its middle at
+   310 (≤390px), linear in --u / --t. Centering blends in through left plus
+   translate(−50%·t): translate % is of the block's own size, so no width is
+   needed.
+   From 1280 up, left follows the page content's edge (max-w-7xl px-30: a
+   centered 1280px container with 120px padding). max() hands over at 1260,
+   where the two meet at 110, so the text never jumps.
+   Wordmark size (one variable for all three stages, so it stays continuous
+   where they swap at 640 and 1024): 142.907 (≥1024) → 138.93 (744) on --u,
+   then held at 138.93 until it reaches the padded span (--pad on the left,
+   44px on the right, ≈537px viewport), below which it shrinks to fill it.
+   --wordmark-em is "Stride"'s advance width in Neue Plak Extended Bold,
+   kerning included (measured in Chrome: 3149px at 1000px). */
+.hero-text {
+  --pad: calc(75px + 35px * var(--u) - 31px * var(--t)); /* 110 → 75 → 44 */
+  --wordmark-em: 3.149;
+  --wordmark-size: min(
+    138.93px + 3.977px * var(--u),
+    (100cqw - var(--pad) - 44px) / var(--wordmark-em)
+  );
+  left: max(
+    var(--pad) + var(--t) * 0.5 * (100% - var(--pad) - 44px),
+    (100cqw - 1280px) / 2 + 120px
+  );
+  top: calc(124px - 9px * var(--u) + 186px * var(--t)); /* 115 → 124 → 310 */
+  translate: calc(var(--t) * -50%) calc(var(--t) * -50%);
+}
+
+.hero-wordmark {
+  font-size: var(--wordmark-size);
+}
+
+/* ─── Hero pool table (see app/_components/TableScene.tsx) ───────────────────
+   Across --u the table slides from its desktop pose to its tablet pose; across
+   --t the camera tilts from the tablet angle to straight top-down. Everything
+   below is derived from them. */
+.table-scene {
+  /* camera elevation, linear in angle: asin(0.2288) (tablet table squash) → 90° */
+  --elevation: calc(13.227deg + 76.773deg * var(--t));
+  --s: sin(var(--elevation)); /* how much the felt is squashed vertically */
+  --c: cos(var(--elevation)); /* how much height shows up as screen offset */
+  /* perspective-ish ball sizing: 1 at tablet, 0 top-down */
+  --p: calc(var(--c) / 0.97347);
+  /* undoes the felt's squash relative to the tablet angle (see shadows) */
+  --unsquash: calc(0.2288 / var(--s));
+
+  /* table center and scale move from the desktop to the tablet to the mobile
+     frame (--t and --u are never both non-zero, so their terms just add).
+     The desktop offset is 145 world px (×1.0363) left of the Figma frame's,
+     undoing the balls' shift so they land where the frame has them. */
+  --k: calc(1 - 0.4572 * var(--t) + 0.0363 * var(--u));
+  position: absolute;
+  left: calc(50% - 6.52px + 8.52px * var(--t) + 238.22px * var(--u));
+  top: calc(615.69px - 236.69px * var(--t) + 9.89px * var(--u));
+}
+
+/* Browsers without length division: step through the blend instead */
+@supports not (width: calc(tan(atan2(1px, 1px)) * 1px)) {
+  .hero-fluid {
+    --t: 0;
+    --u: 0;
   }
+  @media (width >= 814px) {
+    .hero-fluid {
+      --u: 0.25;
+    }
+  }
+  @media (width >= 884px) {
+    .hero-fluid {
+      --u: 0.5;
+    }
+  }
+  @media (width >= 954px) {
+    .hero-fluid {
+      --u: 0.75;
+    }
+  }
+  @media (width >= 64rem) {
+    .hero-fluid {
+      --u: 1;
+    }
+  }
+  @media (width < 656px) {
+    .hero-fluid {
+      --t: 0.25;
+    }
+  }
+  @media (width < 567px) {
+    .hero-fluid {
+      --t: 0.5;
+    }
+  }
+  @media (width < 479px) {
+    .hero-fluid {
+      --t: 0.75;
+    }
+  }
+  @media (width <= 390px) {
+    .hero-fluid {
+      --t: 1;
+    }
+  }
+}
+
+.table-scene svg {
+  position: absolute;
+  left: -620px;
+  top: -640px;
+  max-width: none;
+  overflow: visible;
+  transform: scale(var(--k));
+  transform-origin: 620px 640px;
+}
+
+.table-cone {
+  opacity: calc(0.21 * max(0, 1 - 1.5 * var(--t)));
+}
+
+.table-plane {
+  transform: scale(1, var(--s));
+}
+
+/* Ball radius eases from its tablet size to its top-down size */
+.table-ball,
+.table-ball-shadow,
+.table-cue,
+.table-cue-shadow {
+  --r: calc(var(--rm) + (var(--rt) - var(--rm)) * var(--p));
+}
+
+/* PoolShot moves the balls (and their shadows) from JS: --bx/--bz offset them
+   on the felt (world px), --bs scales them, --spin turns the face (deg) and
+   --sq squashes them on impact (0 → 1). */
+.table-ball {
+  transform: translate(
+      calc((var(--x) + var(--bx, 0)) * 1px),
+      calc(((var(--z) + var(--bz, 0)) * var(--s) - var(--r) * var(--c)) * 1px)
+    )
+    scale(calc(var(--r) * var(--bs, 1)));
+}
+
+.table-ball-spin {
+  transform: scale(calc(1 - 0.07 * var(--sq, 0)), calc(1 + 0.04 * var(--sq, 0)))
+    rotate(calc(var(--spin, 0) * 1deg));
+}
+
+/* Ball shadows blend from the desktop frame's hand-placed ellipses (at the
+   tablet angle, --p = 1) to a lit shadow (top-down, --p = 0). Each is an
+   offset plus a 2×2 matrix on the unit circle, both in ball radii.
+   Lit: light straight from the left (azimuth 0°), elevation atan(4) ≈ 76°,
+   like a lamp nearly overhead. A sphere's shadow is an ellipse pushed
+   r·cot(elev) along the light, stretched 1/sin(elev) along it, i.e. offset
+   (0.25, 0) and matrix scale(1.0308, 1): a thin crescent to the right that
+   stays within the ball's height.
+   Figma: per ball, --sx/--sz and --sa…--sd (see TableScene). Their depth
+   terms are scaled by --unsquash so they keep their on-screen size as the
+   camera tilts up, instead of ballooning once the felt stops being squashed. */
+.table-ball-shadow {
+  transform: translate(
+      calc((var(--x) + var(--bx, 0) + var(--r) * (0.25 + (var(--sx) - 0.25) * var(--p))) * 1px),
+      calc((var(--z) + var(--bz, 0) + var(--r) * var(--sz) * var(--unsquash) * var(--p)) * 1px)
+    )
+    matrix(
+      calc(var(--r) * (1.0308 + (var(--sa) - 1.0308) * var(--p))),
+      calc(var(--r) * var(--sb) * var(--unsquash) * var(--p)),
+      calc(var(--r) * var(--sc) * var(--p)),
+      calc(var(--r) * (1 + (var(--sd) * var(--unsquash) - 1) * var(--p))),
+      0,
+      0
+    )
+    scale(var(--bs, 1));
+}
+
+/* The cue is a 3D segment aimed at the cue ball, at a point 0.32 radii above
+   its center, butt raised 5.1° (sin 0.08889, cos 0.99604). (--hx, --hz) is its
+   horizontal direction tip → butt; the defaults are the desktop frame's pose,
+   from the right at -10.14° off the x axis (9026:1631). It's 792.2 long and its
+   tip sits 2.42 radii out. PoolShot re-aims it for the second shot through
+   inline --hx/--hz, --hs (-1 when it points left, keeping the shadow's sides)
+   and --ox/--oz (world px from the ball's start, to where the ball is now).
+   --slide (set from JS on the cue and its shadow, in ball radii) pulls it back along
+   that axis for the intro and the shot. */
+.table-cue,
+.table-cue-shadow {
+  --hx: 0.98439;
+  --hz: -0.17602;
+  --hs: 1;
+  --ox: 0;
+  --oz: 0;
+  --dx: calc(var(--hx) * 0.99604);
+  --dz: calc(var(--hz) * 0.99604);
+  --gap: calc((2.4205 + var(--slide, 0)) * var(--r));
+  --tx: calc(var(--x) + var(--ox) + var(--dx) * var(--gap));
+  --tz: calc(var(--z) + var(--oz) + var(--dz) * var(--gap));
+  --th: calc(1.3198 * var(--r) + 0.08889 * var(--gap));
+  /* shrinks the cue and its shadow with depth, like the ball they're aimed at:
+     --depth-slope comes from TableScene. It's 1 in the first pose (--oz is 0)
+     and top-down (--p is 0). Both tips are their transform origins, so they stay put. */
+  --cs: calc(1 + var(--depth-slope) * var(--p) * var(--oz) / var(--r));
+}
+
+.table-cue {
+  --dy: calc(var(--dz) * var(--s) - 0.08889 * var(--c));
+  transform: translate(
+      calc(var(--tx) * 1px),
+      calc((var(--tz) * var(--s) - var(--th) * var(--c)) * 1px)
+    )
+    rotate(atan2(var(--dy), var(--dx)))
+    scale(calc(792.2 * hypot(var(--dx), var(--dy)) * var(--cs)), calc(19 * var(--cs)));
+}
+
+/* The browser's outline would stretch with the cue's scale into a band across
+   the hero, even after a mouse click, so it's off for all focus. For keyboard
+   focus the cue draws its own, with a non-scaling stroke. */
+.table-cue:focus {
+  outline: none;
+}
+
+.table-cue-focus {
+  display: none;
+  pointer-events: none;
+}
+
+.table-cue:focus-visible .table-cue-focus {
+  display: block;
+}
+
+/* Shadow of the cue on the felt, cast by the same light as the balls rather
+   than the Figma band (9026:1665). The light pushes a point at height h by
+   h·(--lx, --lz) on the felt: at the tablet angle that's the average of the
+   Figma ball shadow offsets (0.707, -1.725), top-down (0.15, 0), with the
+   same blend and unsquash as the ball shadows. Top-down the push is shorter
+   than the balls' 0.25 so the shadow hugs the cue: it slides along the cue
+   toward the butt, starts behind the tip and only peeks out below the cue.
+   The axis column is the cue's 792.2 length, butt raised 70.42; the width
+   column is the cue's 19px round section projected along the light: its
+   horizontal radius (-hz, hx, 0) and up radius (-0.08889 hx, -0.08889 hz,
+   0.99606), each measured across the shadow's axis.
+   On phones (≤430px, --under = 1, eased in from 500px) the shadow instead sits
+   directly under the cue as drawn: a push of (0, -c/s) lines it up with the
+   cue's lifted screen position, and the desktop thickening is dropped. It's
+   then nudged 12.9 world px across the cue toward the viewer (--peek), so ~7px
+   shows below the cue at 390px (table scale 0.5428). */
+.table-cue-shadow {
+  --under: clamp(0, (var(--t) - 0.6893) / 0.1977, 1);
+  --peek: calc(12.9 * var(--under));
+  --lx: calc((0.15 + 0.557 * var(--p)) * (1 - var(--under)));
+  --lz: calc(
+    -1.725 * var(--unsquash) * var(--p) * (1 - var(--under)) - var(--c) / var(--s) * var(--under)
+  );
+  --ax: calc(792.2 * var(--dx) + 70.42 * var(--lx));
+  --az: calc(792.2 * var(--dz) + 70.42 * var(--lz));
+  --ux: calc(var(--ax) / hypot(var(--ax), var(--az)));
+  --uz: calc(var(--az) / hypot(var(--ax), var(--az)));
+  /* thickened toward the tablet angle, where the flat camera makes the true
+     projected width read too thin (top-down stays physical) */
+  --w: calc(
+    19 * (1 + 0.75 * var(--p) * (1 - var(--under))) *
+      hypot(
+        var(--ux) * var(--hx) + var(--uz) * var(--hz),
+        var(--ux) * (0.99606 * var(--lz) - 0.08889 * var(--hz)) -
+          var(--uz) * (0.99606 * var(--lx) - 0.08889 * var(--hx))
+      )
+  );
+  transform: translate(
+      calc((var(--tx) + var(--th) * var(--lx) - var(--uz) * var(--peek) * var(--hs)) * 1px),
+      calc((var(--tz) + var(--th) * var(--lz) + var(--ux) * var(--peek) * var(--hs)) * 1px)
+    )
+    matrix(
+      calc(var(--ax) * var(--cs)),
+      calc(var(--az) * var(--cs)),
+      calc(-1 * var(--uz) * var(--w) * var(--hs) * var(--cs)),
+      calc(var(--ux) * var(--w) * var(--hs) * var(--cs)),
+      0,
+      0
+    );
 }
