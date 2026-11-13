@@ -3,9 +3,11 @@ import HeroIntro from "./HeroIntro";
 import PoolShot from "./PoolShot";
 import TableScene from "./TableScene";
 
-// The hero has three fixed-size stages (desktop 1280, tablet 744, mobile 390),
-// each centered and swapped at a breakpoint. Only the pool table scene moves
-// continuously with width, desktop → tablet → mobile (see TableScene).
+// The hero has three stages (desktop 1280, tablet 744, mobile 390), each
+// centered and swapped at a breakpoint. Tablet and mobile are fixed-size;
+// desktop widens with the window above 1280, up to the hero frame (1680).
+// Only the pool table scene moves continuously with width, desktop → tablet →
+// mobile (see TableScene).
 // HeroIntro plays the entrance: glowing title, table light flicker, cue slide.
 // Then PoolShot lets you take the shot; the stages above the table pass
 // pointer events through to it, except on their links.
@@ -31,11 +33,18 @@ type Star = typeof RED & {
 };
 
 // Figma 9026:1631
+// The desktop stage is as wide as the hero frame (1280 up to --hero-frame, see
+// globals.css). The two stars beside the title are placed from its left; the
+// two in the light cone are placed from its right (1280 - left - size in the
+// Figma frame: 866 and 1119), so they follow the table, which is pinned to the
+// frame's right edge. The yellow one, at the cone's edge in the Figma frame
+// (657, 84), moves into the gap that opens between the title and the cone
+// (.hero-star-gap in globals.css).
 const desktopStars: Star[] = [
   { ...RED, box: "left-[45px] top-[132px] size-[48px]", spin: "12.5s", delay: "0s", twinkle: "4s", twinkleDelay: "0s" },
-  { ...RED, box: "left-[866px] top-[300px] size-[48px]", spin: "11.5s", delay: "-0.3s", twinkle: "3.5s", twinkleDelay: "-3.2s" },
-  { ...YELLOW, box: "left-[657px] top-[84px] size-[61px]", spin: "13.5s", delay: "-0.6s", twinkle: "4.5s", twinkleDelay: "-6.5s" },
-  { ...BLUE, box: "left-[1119px] top-[187.5px] size-[67px]", spin: "12s", delay: "-0.9s", twinkle: "3.75s", twinkleDelay: "-2.5s" },
+  { ...RED, box: "right-[366px] top-[300px] size-[48px]", spin: "11.5s", delay: "-0.3s", twinkle: "3.5s", twinkleDelay: "-3.2s" },
+  { ...YELLOW, box: "hero-star-gap size-[61px]", spin: "13.5s", delay: "-0.6s", twinkle: "4.5s", twinkleDelay: "-6.5s" },
+  { ...BLUE, box: "right-[94px] top-[187.5px] size-[67px]", spin: "12s", delay: "-0.9s", twinkle: "3.75s", twinkleDelay: "-2.5s" },
   { ...BLUE, box: "left-[146px] top-[505px] size-[92px] rotate-[13.61deg]", spin: "13s", delay: "-1.2s", twinkle: "4.25s", twinkleDelay: "-6.1s" },
 ];
 
@@ -212,8 +221,10 @@ export default function Hero() {
           <div data-hero-dim aria-hidden className="pointer-events-none absolute inset-0 bg-black opacity-70" />
         </div>
 
-        {/* star stages: fixed-size frames centered per breakpoint */}
-        <div className="absolute left-1/2 top-0 hidden h-full w-[1280px] -translate-x-1/2 pointer-events-none lg:block">
+        {/* star stages: frames centered per breakpoint. Tablet and mobile are
+            fixed-size; desktop is 1280 wide until the window is wider, then
+            follows the hero frame up to --hero-frame (see desktopStars). */}
+        <div className="absolute left-1/2 top-0 hidden h-full w-[max(1280px,min(100%,var(--hero-frame)))] -translate-x-1/2 pointer-events-none lg:block">
           <Stars stars={desktopStars} />
         </div>
         <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 pointer-events-none sm:block lg:hidden">

@@ -113,10 +113,10 @@ test("spotlight cone takes its shape for each width", async ({ page }) => {
   }
 });
 
-// From 1280 to 1440 the table is pinned to the hero's right edge, so the eight
-// ball keeps the desktop frame's gap (Figma 9026:1631). Below 1280 the table is
-// placed from the center (17.5px at 1024), and from 1440 up it is again, 80px
-// further right, so the gap grows by half of any extra width.
+// From 1280 to 1680 (--hero-frame in globals.css) the table is pinned to the
+// hero's right edge, so the eight ball keeps the desktop frame's gap (Figma
+// 9026:1631). Below 1280 the table is placed from the center (17.5px at 1024),
+// and from 1680 up it is again, so the gap grows by half of any extra width.
 const eightBallGap = (page: Page) =>
   page.evaluate(() => {
     const hero = document.querySelector(".hero-fluid")!.getBoundingClientRect();
@@ -129,8 +129,10 @@ const GAPS = [
   { width: 1280, gap: 145.5 },
   { width: 1360, gap: 145.5 },
   { width: 1440, gap: 145.5 },
-  { width: 1920, gap: 385.5 },
-  { width: 2560, gap: 705.5 },
+  { width: 1500, gap: 145.5 },
+  { width: 1680, gap: 145.5 },
+  { width: 1920, gap: 265.5 },
+  { width: 2560, gap: 585.5 },
 ];
 
 test("eight ball keeps its gap from the right edge at each width", async ({ page }) => {
@@ -149,18 +151,19 @@ test("eight ball keeps its gap from the right edge at each width", async ({ page
 const tableLeft = (page: Page) =>
   page.evaluate(() => parseFloat(getComputedStyle(document.querySelector(".table-scene")!).left));
 
-// The title follows the centered page content, so past 1440 the table has to
-// as well or the two drift apart on very wide screens.
-test("table keeps its distance from the hero text from 1440px up", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
+// Past 1680 the title and the table both sit in the centered hero frame, so
+// they stop moving apart: the table's center stays 1151.7px from the title's
+// left (1680 - 408.3 - 120) however wide the screen is.
+test("table keeps its distance from the hero text from 1680px up", async ({ page }) => {
+  await page.setViewportSize({ width: 1680, height: 900 });
   await page.goto("/");
 
-  for (const width of [1440, 1920, 2560, 3040]) {
+  for (const width of [1680, 1920, 2560, 3040]) {
     await test.step(`at ${width}px`, async () => {
       await page.setViewportSize({ width, height: 900 });
 
       const text = await page.locator("[data-hero-text]:visible").boundingBox();
-      expect.soft(Math.abs((await tableLeft(page)) - text!.x - 831.7)).toBeLessThanOrEqual(1);
+      expect.soft(Math.abs((await tableLeft(page)) - text!.x - 1151.7)).toBeLessThanOrEqual(1);
     });
   }
 });
@@ -171,7 +174,8 @@ test("table doesn't jump where the pin starts and stops", async ({ page }) => {
 
   for (const widths of [
     [1260, 1270, 1280, 1290, 1300],
-    [1420, 1430, 1440, 1450, 1460],
+    [1420, 1430, 1440, 1450, 1460], // inside the pin, where it used to stop
+    [1660, 1670, 1680, 1690, 1700],
   ]) {
     await test.step(`between ${widths[0]}px and ${widths[4]}px`, async () => {
       const lefts: number[] = [];

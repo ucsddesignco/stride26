@@ -63,6 +63,10 @@ body {
   --t: clamp(0, (744 - var(--viewport)) / 244, 1);
   --m: clamp(1, var(--viewport) / 390, 1.2821);
   --u: clamp(0, (var(--viewport) - 744) / 280, 1);
+  /* Above 1280 the hero is a frame up to this wide: the Figma 1280 frame
+     stretched, with the text held at its left edge and the table at its right
+     (see .hero-text and .table-scene). Past it the whole frame is centered. */
+  --hero-frame: 1680px;
   /* lets the mobile wordmark fit the section's real width (cqw), scrollbar-safe */
   container-type: inline-size;
 }
@@ -74,9 +78,12 @@ body {
    stays at 310. Centering blends in through left plus
    translate(−50%·t): translate % is of the block's own size, so no width is
    needed.
-   From 1280 up, left follows the page content's edge (max-w-7xl px-30: a
-   centered 1280px container with 120px padding). max() hands over at 1260,
-   where the two meet at 110, so the text never jumps.
+   At 1280 left is the page content's edge (max-w-7xl px-30: a centered 1280px
+   container with 120px padding), 120. max() hands over to that edge at 1260,
+   where the two meet at 110, so the text never jumps. From 1280 up to
+   --hero-frame (1680) left holds 120, the stretched Figma frame's left margin,
+   and no longer follows the page content. Past --hero-frame it is 120 inside
+   the centered frame (240 at 1920). min() and max() meet at 1280 and 1680.
    Wordmark size (one variable for all three stages, so it stays continuous
    where they swap at 640 and 1024): 142.907 (≥1024) → 138.93 (744) on --u,
    then held at 138.93 until it reaches the padded span (--pad on the left,
@@ -94,7 +101,10 @@ body {
   );
   left: max(
     var(--pad) + var(--t) * 0.5 * (100% - var(--pad) - var(--pad-right)),
-    (100cqw - 1280px) / 2 + 120px
+    min(
+      (100cqw - 1280px) / 2 + 120px,
+      max(120px, (100cqw - var(--hero-frame)) / 2 + 120px)
+    )
   );
   top: calc(124px - 9px * var(--u) + 186px * var(--t)); /* 115 → 124 → 310 */
   translate: calc(var(--t) * -50%) calc(var(--t) * -50%);
@@ -125,16 +135,19 @@ body {
      table grows around its center and the 760px hero crops what doesn't fit.
      The desktop offset is 145 world px (×1.0363) left of the Figma frame's,
      undoing the balls' shift so they land where the frame has them.
-     From 1280 to 1440 the desktop pose is pinned to the right edge instead of
-     the center, so the eight ball's right edge stays 145.5px from it (the
-     frame's gap) and the cone slides 80px away from the title. Its center is
-     then 100% - 408.3px. From 1440 up it is placed from the center again, 80px
-     further right, so it stays that far from the title (which follows the
-     centered page content) however wide the window gets. clamp() meets both
-     neighbours at 1280 and 1440, so the table never jumps. */
+     From 1280 to --hero-frame (1680) the desktop pose is pinned to the right
+     edge instead of the center, so the eight ball's right edge stays 145.5px
+     from it (the frame's gap) while the title holds 120px from the left: the
+     Figma frame stretched. Its center is then 100% - 408.3px, which is the
+     clamp's middle term (50% - 401.78px) plus the 50% - 6.52px in front of it.
+     Past --hero-frame it is placed from the center again, where the pin left
+     it: the clamp's upper bound is --hero-frame / 2 - 401.78px (438.22px), so
+     the center sits at 50% + 431.7px (438.22 - 6.52) and stays 1151.7px from
+     the title's left however wide the window gets. clamp() meets both
+     neighbours at 1280 and 1680, so the table never jumps. */
   --k: calc(1 - var(--t) * (1 - 0.5428 * var(--m)) + 0.0363 * var(--u));
   position: absolute;
-  left: calc(50% - 6.52px + var(--t) * (6.52px + 2px * var(--m)) + var(--u) * clamp(238.22px, 50% - 401.78px, 318.22px));
+  left: calc(50% - 6.52px + var(--t) * (6.52px + 2px * var(--m)) + var(--u) * clamp(238.22px, 50% - 401.78px, var(--hero-frame) / 2 - 401.78px));
   top: calc(615.69px - 236.69px * var(--t) + 9.89px * var(--u));
 }
 
@@ -195,6 +208,22 @@ body {
       --m: 1;
     }
   }
+}
+
+/* Desktop yellow star (see desktopStars in Hero.tsx). Up to 1280 it sits in its
+   Figma place, 657 across and 84 down (562 from the stage's right), at the
+   cone's edge. Above that the title holds still while the cone moves away with
+   the table, so a gap opens between "Stride" (ends 570 across) and the cone
+   (1059 across at the star's height at 1680). The star drifts into the middle
+   of that gap and down beside the wordmark's top: by --hero-frame it is 784
+   across (127 further, so 0.6825 = 1 - 127/400 of the widening goes to its
+   right offset) and 150 down (66 lower, 0.165 = 66/400). --widen is how much
+   wider than 1280 the star stage is, so past --hero-frame the star holds its
+   place in the frame. */
+.hero-star-gap {
+  --widen: clamp(0px, 100cqw - 1280px, var(--hero-frame) - 1280px);
+  right: calc(562px + 0.6825 * var(--widen));
+  top: calc(84px + 0.165 * var(--widen));
 }
 
 /* Mobile star stage (see Hero.tsx): scales with the mobile frame around the
