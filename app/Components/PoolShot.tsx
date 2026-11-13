@@ -22,8 +22,8 @@ import {
 
 // Two shots on a table that carries on past the light. Hovering the cue or the
 // white ball draws the cue back a little. Click the table or the
-// cue: the white ball rolls out of the lamp's light at the left edge, bounces
-// off a wall nobody can see, rolls back into it at the top edge and smacks the blue ball, which
+// cue: the white ball rolls off the front-left edge, waits out of sight,
+// rolls back in at the top edge and smacks the blue ball, which
 // rolls out of the light while the white ball slows and settles on its spot. The
 // cue then comes in from the left, and a second click sends the white ball out
 // the right edge and back in from the front, into the eight ball, which flies off
@@ -46,20 +46,19 @@ const unit = (x: number, z: number): Point => {
 
 // Where the white ball heads on each shot. Each exit is along the cue, and each
 // entry is also the line the struck ball leaves on: a head-on hit sends it
-// straight on. The exit and entry don't form a true reflection (the cue's heading
-// can't reach the balls with a real bank), but they read as one, and nobody can
-// see the walls.
+// straight on. There's no wall: off the table the ball waits OFF_TABLE_TIME,
+// then is moved to the entry line and rolls in, so the pair reads as a bank.
 const FIRST_EXIT: Point = { x: -0.98439, z: 0.17602 }; // the cue's rest heading, toward the tip
 const FIRST_ENTRY = unit(0.906, 0.423);
-const FIRST_WALL: Point = { x: -540, z: -120 };
 const SECOND_EXIT = unit(0.995, 0.1); // flat enough that the cue clears the desktop text
 const SECOND_ENTRY = unit(-0.5, -0.87); // about 120° on the table seen from above; steeper puts the white ball off the felt on a flat camera
-const SECOND_WALL: Point = { x: 590, z: 190 };
 
-// One rolling ball's physics, in world px and seconds. Every speed is worked
-// backward from GONE_SPEED, so the whole path decelerates like one ball.
+// One rolling ball's physics, in world px and seconds. The white ball's speeds
+// in are worked backward from GONE_SPEED; its speeds out from its EXIT_SPEED.
 const FRICTION = 180; // px/s²
-const BOUNCE_KEEP = 0.85; // share of its speed a ball keeps off a wall
+const OFF_TABLE_TIME = 0.8; // s the white ball waits off the table on each shot
+const FIRST_EXIT_SPEED = 970; // px/s the white ball still has as it goes off the table
+const SECOND_EXIT_SPEED = 1138;
 const GONE_SPEED = 140; // px/s a struck ball still has as it leaves the light
 const EIGHT_GONE_SPEED = 640; // the eight ball is hit much harder, and is still flying as it leaves
 
@@ -169,39 +168,15 @@ type SceneBall = {
   spot: { el: SVGCircleElement; u: number; v: number } | null;
 };
 
+// One straight roll to (x, z), from v0 to v1 px/s.
 type Leg = Point & { v0: number; v1: number };
 type Roll = {
   ball: SceneBall;
-  legs: Leg[];
-  index: number;
+  leg: Leg;
   time: number;
   from: Point;
   done: () => void;
 };
-
-// Out to the rim, off a wall in the dark, back in from the rim to contact,
-// arriving at `contactSpeed`. Worked backward so friction and the bounce's loss
-// make one continuous slowdown.
-function bankLegs(
-  start: Point,
-  exit: Point,
-  wall: Point,
-  entry: Point,
-  contact: Point,
-  contactSpeed: number,
-): Leg[] {
-  const atEntry = speedBefore(contactSpeed, distance(entry, contact));
-  const offWall = speedBefore(atEntry, distance(wall, entry));
-  const atWall = offWall / BOUNCE_KEEP;
-  const atExit = speedBefore(atWall, distance(exit, wall));
-  const atStart = speedBefore(atExit, distance(start, exit));
-  return [
-    { ...exit, v0: atStart, v1: atExit },
-    { ...wall, v0: atExit, v1: atWall },
-    { ...entry, v0: offWall, v1: atEntry },
-    { ...contact, v0: atEntry, v1: contactSpeed },
-  ];
-}
 
 // The part of a ball out of the lamp's light, as a path on its unit circle
 // (clipped just past it): "" while it's all lit, null once all you can see is dark.
@@ -475,30 +450,19 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     const advance = (roll: Roll, dt: number) => {
       roll.time += dt;
-      for (;;) {
-        const leg = roll.legs[roll.index];
-        const length = distance(roll.from, leg);
-        const duration = (2 * length) / (leg.v0 + leg.v1);
-        if (roll.time < duration) {
-          const t = roll.time;
-          const s = leg.v0 * t + ((leg.v1 - leg.v0) / (2 * duration)) * t * t;
-          const f = s / length;
-          placeBall(
-            { x: roll.from.x + (leg.x - roll.from.x) * f, z: roll.from.z + (leg.z - roll.from.z) * f },
-            roll.ball,
-          );
-          return;
-        }
-        roll.time -= duration;
-        roll.from = { x: leg.x, z: leg.z };
-        roll.index += 1;
-        if (roll.index === roll.legs.length) {
-          placeBall(roll.from, roll.ball);
-          rolls.delete(roll);
-          roll.done();
-          return;
-        }
+      const { leg, from } = roll;
+      const length = distance(from, leg);
+      const duration = (2 * length) / (leg.v0 + leg.v1);
+      if (roll.time < duration) {
+        const t = roll.time;
+        const s = leg.v0 * t + ((leg.v1 - leg.v0) / (2 * duration)) * t * t;
+        const f = s / length;
+        placeBall({ x: from.x + (leg.x - from.x) * f, z: from.z + (leg.z - from.z) * f }, roll.ball);
+        return;
       }
+      placeBall(leg, roll.ball);
+      rolls.delete(roll);
+      roll.done();
     };
 
     // One loop for every rolling ball, running only while one is.
@@ -509,9 +473,9 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       raf = rolls.size > 0 ? requestAnimationFrame(tick) : null;
     };
 
-    const roll = (ball: SceneBall, legs: Leg[]) =>
+    const roll = (ball: SceneBall, leg: Leg) =>
       new Promise<void>((done) => {
-        rolls.add({ ball, legs, index: 0, time: 0, from: { x: ball.x, z: ball.z }, done });
+        rolls.add({ ball, leg, time: 0, from: { x: ball.x, z: ball.z }, done });
         if (raf === null) {
           lastFrame = performance.now();
           raf = requestAnimationFrame(tick);
@@ -553,7 +517,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       return id === shotId;
     };
 
-    // The cue strikes and the white ball banks round through the dark into `target`.
+    // The cue strikes and the white ball rolls off the table at `exitSpeed`, waits
+    // OFF_TABLE_TIME out of sight, then is moved onto the line in and rolls into `target`.
     // `target` rolls on along the same line out of the light, still at `goneSpeed` as
     // it leaves, and the white ball follows slowly, stopping on the spot `target` left.
     // `settled` resolves with both balls at rest, or early if `id` goes stale.
@@ -562,32 +527,35 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       target: SceneBall,
       exitDir: Point,
       entryDir: Point,
-      wall: Point,
+      exitSpeed: number,
       goneSpeed: number,
     ) => {
       const contact = contactPoint(target, entryDir);
       const offTable = TABLE_RADIUS + OFF_TABLE_PAST;
+      const exit = rayToRadius(white, exitDir, offTable);
+      const entry = rayToRadius(contact, opposite(entryDir), offTable);
       const targetEnd = rayToRadius(target, entryDir, offTable);
       const contactSpeed = speedBefore(goneSpeed, distance(target, targetEnd));
-      const legs = bankLegs(
-        { x: white.x, z: white.z },
-        rayToRadius(white, exitDir, offTable),
-        wall,
-        rayToRadius(contact, opposite(entryDir), offTable),
-        contact,
-        contactSpeed,
-      );
+      const entrySpeed = speedBefore(contactSpeed, distance(entry, contact));
 
       let settled: Promise<void> = Promise.resolve();
       const struck = strike(id, () => {
         settled = (async () => {
-          await roll(white, legs);
+          await roll(white, { ...exit, v0: speedBefore(exitSpeed, distance(white, exit)), v1: exitSpeed });
+          if (id !== shotId) return;
+          await pause(OFF_TABLE_TIME * 1000);
+          if (id !== shotId) return;
+          // set its position first, so placeBall doesn't roll it across the gap
+          white.x = entry.x;
+          white.z = entry.z;
+          placeBall(entry, white);
+          await roll(white, { ...contact, v0: entrySpeed, v1: contactSpeed });
           if (id !== shotId) return;
           const { x, z } = target.spec;
           const follow = speedBefore(0, distance(contact, target.spec));
           await Promise.all([
-            roll(target, [{ ...targetEnd, v0: contactSpeed, v1: goneSpeed }]),
-            roll(white, [{ x, z, v0: follow, v1: 0 }]),
+            roll(target, { ...targetEnd, v0: contactSpeed, v1: goneSpeed }),
+            roll(white, { x, z, v0: follow, v1: 0 }),
           ]);
           if (id === shotId) putAway(target);
         })();
@@ -633,7 +601,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     };
 
     const firstShot = async (id: number) => {
-      const { struck, settled } = bankShot(id, blue, FIRST_EXIT, FIRST_ENTRY, FIRST_WALL, GONE_SPEED);
+      const { struck, settled } = bankShot(id, blue, FIRST_EXIT, FIRST_ENTRY, FIRST_EXIT_SPEED, GONE_SPEED);
       if (!(await struck)) return;
 
       const cueGone = pullCueAway(id, FIRST_EXIT);
@@ -652,7 +620,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         eight,
         SECOND_EXIT,
         SECOND_ENTRY,
-        SECOND_WALL,
+        SECOND_EXIT_SPEED,
         EIGHT_GONE_SPEED,
       );
       if (!(await struck)) return;
