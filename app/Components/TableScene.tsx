@@ -250,6 +250,27 @@ export default function TableScene() {
             </g>
           </g>
         ))}
+
+        {/* "Click me" beside the smiley (Figma 9346:258), until the first shot:
+            PoolShot marks it data-dismissed. Laid out in screen px from the
+            text's top right corner, which .table-hint in globals.css places in
+            ball radii from the ball and holds at one size at every width. The
+            arrow is the Figma vector in its 20.871 × 16.779 box (the file adds
+            1px for the stroke), turned as in the frame; the frame has the
+            label on the ball's right, so the leading scale(-1 1) mirrors it. */}
+        <g aria-hidden data-pool-hint className="table-hint" style={ballVars(cueBall)}>
+          <text className="table-hint-text font-sans" y="14.5" fontSize="16" fill="#FFFFFF" textAnchor="end">
+            Click me
+          </text>
+          <image
+            href="/hero/click-me-arrow.svg"
+            x="-1"
+            y="-1"
+            width="23.3978"
+            height="18.7789"
+            transform="scale(-1 1) translate(24.061 30.495) rotate(173.64) scale(1 -1) translate(-10.4355 -8.3895)"
+          />
+        </g>
       </svg>
     </div>
   );

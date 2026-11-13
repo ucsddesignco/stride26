@@ -37,9 +37,9 @@ type Star = typeof RED & {
 // globals.css). The two stars beside the title are placed from its left; the
 // two in the light cone are placed from its right (1280 - left - size in the
 // Figma frame: 866 and 1119), so they follow the table, which is pinned to the
-// frame's right edge. The yellow one, at the cone's edge in the Figma frame
-// (657, 84), moves into the gap that opens between the title and the cone
-// (.hero-star-gap in globals.css).
+// frame's right edge. The yellow one leaves its Figma place at the cone's edge
+// (657, 84) and sits at 712, 150 from the left at every desktop width, beside
+// the wordmark's top (.hero-star-gap in globals.css).
 const desktopStars: Star[] = [
   { ...RED, box: "left-[45px] top-[132px] size-[48px]", spin: "12.5s", delay: "0s", twinkle: "4s", twinkleDelay: "0s" },
   { ...RED, box: "right-[366px] top-[300px] size-[48px]", spin: "11.5s", delay: "-0.3s", twinkle: "3.5s", twinkleDelay: "-3.2s" },
@@ -56,10 +56,11 @@ const tabletStars: Star[] = [
   { ...BLUE, box: "left-[78px] top-[380.34px] size-[92px]", spin: "12s", delay: "-0.9s", twinkle: "3.75s", twinkleDelay: "-2.5s" },
 ];
 
-// Figma 9026:2071
+// Figma 9026:2071, except the bottom red star: moved up and right from Figma's
+// 300, 671.34 so it stays inside the hero when the stage scales up to 500px.
 const mobileStars: Star[] = [
   { ...RED, box: "left-[112px] top-[0.34px] size-[37px]", spin: "12.5s", delay: "0s", twinkle: "4s", twinkleDelay: "0s" },
-  { ...RED, box: "left-[300px] top-[671.34px] size-[37px]", spin: "11.5s", delay: "-0.3s", twinkle: "3.5s", twinkleDelay: "-3.2s" },
+  { ...RED, box: "left-[318px] top-[628px] size-[37px]", spin: "11.5s", delay: "-0.3s", twinkle: "3.5s", twinkleDelay: "-3.2s" },
   { ...YELLOW, box: "left-[306px] top-[45.34px] size-[61px]", spin: "13.5s", delay: "-0.6s", twinkle: "4.5s", twinkleDelay: "-6.5s" },
   { ...BLUE, box: "left-[112px] top-[606.34px] size-[92px] rotate-[7.8deg]", spin: "12s", delay: "-0.9s", twinkle: "3.75s", twinkleDelay: "-2.5s" },
 ];
@@ -258,14 +259,14 @@ export default function Hero() {
           <EventDetails date={"Wednesday, November 18  |  6:30-9:00 PM"} iconClassName="opacity-80" />
         </div>
 
-        {/* mobile: the block is centered (middle at y 310 at 390px); the details
+        {/* mobile: the block is centered (middle at y 302 at 390px, 8px above Figma's 310 to leave room for "Click me"); the details
             are left-aligned with the wordmark */}
         <div
           data-hero-text
-          className="pointer-events-none hero-text absolute z-10 flex flex-col items-start gap-[2px] opacity-0 sm:hidden [&_a]:pointer-events-auto"
+          className="pointer-events-none hero-text hero-text-mobile absolute z-10 flex flex-col items-start opacity-0 sm:hidden [&_a]:pointer-events-auto"
         >
           <Wordmark />
-          <EventDetails date={"Wed, November 18  |  6:30-9:00 PM"} />
+          <EventDetails date={"Wed, November 18  |  6:30-9:00 PM"} className="hero-subtitle-gap" />
         </div>
       </HeroIntro>
     </section>

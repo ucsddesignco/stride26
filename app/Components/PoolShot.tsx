@@ -12,7 +12,8 @@ import {
 import { CUE_PAUSE, KEYFRAMES } from "./HeroIntro";
 import { DEPTH_SLOPE, TABLE_RADIUS, blueBall, cueBall, eightBall } from "./TableScene";
 
-// Two shots on a table that carries on past the light. Click the table or the
+// Two shots on a table that carries on past the light. Hovering the cue or the
+// white ball draws the cue back a little. Click the table or the
 // cue: the white ball fades out at the left edge, bounces off a wall
 // nobody can see, fades back in on the top edge and smacks the blue ball, which
 // rolls out of the light while the white ball slows and settles on its spot. The
@@ -196,6 +197,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     const eight = makeBall(eightBall);
     if (!white || !blue || !eight) return;
     const movingBalls = [white, blue, eight];
+    // "Click me": gone for good once the first shot is taken
+    const hint = root.querySelector<SVGElement>("[data-pool-hint]");
 
     let stage: "first" | "second" | "done" = "first";
     const isDone = () => stage === "done";
@@ -534,6 +537,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       if (busy || stage === "done" || !ready()) return;
       busy = true;
       const id = shotId;
+      hint?.setAttribute("data-dismissed", "");
       hoverAnim?.stop();
       run(hover, 0, { duration: 0.15 });
       view = measure();
@@ -666,8 +670,12 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     const onEnter = () => nudge(HOVER_NUDGE);
     const onLeave = () => nudge(0);
 
-    cue.addEventListener("pointerenter", onEnter);
-    cue.addEventListener("pointerleave", onLeave);
+    // hovering the white ball draws the cue back too
+    const hoverParts = [cue, white.el];
+    hoverParts.forEach((el) => {
+      el.addEventListener("pointerenter", onEnter);
+      el.addEventListener("pointerleave", onLeave);
+    });
     cue.addEventListener("keydown", onKey);
     root.addEventListener("click", onTableClick);
 
@@ -676,8 +684,10 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       root.removeEventListener("click", onTableClick);
       stopAll();
       unsubscribe.forEach((u) => u());
-      cue.removeEventListener("pointerenter", onEnter);
-      cue.removeEventListener("pointerleave", onLeave);
+      hoverParts.forEach((el) => {
+        el.removeEventListener("pointerenter", onEnter);
+        el.removeEventListener("pointerleave", onLeave);
+      });
       cue.removeEventListener("keydown", onKey);
     };
   }, []);

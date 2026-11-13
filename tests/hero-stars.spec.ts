@@ -69,19 +69,19 @@ test("desktop stars stay clear of the wordmark", async ({ page }) => {
   }
 });
 
-// The yellow star sits at the cone's edge in the Figma frame. Above 1280 it
-// moves into the gap that opens between the wordmark and the cone, and down
-// beside the wordmark's top, reaching its place at 1680 (.hero-star-gap in
-// globals.css); past that it holds its place in the centered hero frame.
+// The yellow star sits between the wordmark and the cone, beside the
+// wordmark's top, at 712, 150 in the star stage at every desktop width
+// (.hero-star-gap in globals.css). The stage is the hero frame: a centered
+// 1280 at and below 1280, the full width up to 1680, a centered 1680 above.
 const YELLOW_STAR = [
-  { width: 1024, left: 529, top: 84 },
-  { width: 1280, left: 657, top: 84 },
-  { width: 1500, left: 726.85, top: 120.3 },
-  { width: 1680, left: 784, top: 150 },
-  { width: 1920, left: 904, top: 150 },
+  { width: 1024, left: 584, top: 150 },
+  { width: 1280, left: 712, top: 150 },
+  { width: 1500, left: 712, top: 150 },
+  { width: 1680, left: 712, top: 150 },
+  { width: 1920, left: 832, top: 150 },
 ];
 
-test("yellow star moves into the gap between the wordmark and the cone", async ({ page }) => {
+test("yellow star sits in the gap between the wordmark and the cone", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/");
 
