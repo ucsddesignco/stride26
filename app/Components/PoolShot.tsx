@@ -80,6 +80,17 @@ const CUE_ENTER = 1.1;
 const CUE_ENTER_EASE = [0.16, 1, 0.3, 1] as const;
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+// Test hook: the Playwright tests set window.__poolShotSpeed before the page
+// loads to play the shots faster than real time. Nothing else sets it, so it
+// is 1 for visitors. It scales the cue, the rolls and the pauses; the table
+// reset's light flicker always runs at its real speed.
+type PoolWindow = Window & { __poolShotSpeed?: number };
+const speed = () => {
+  const s = (window as PoolWindow).__poolShotSpeed;
+  return typeof s === "number" && s > 0 ? s : 1;
+};
+const pause = (ms: number) => sleep(ms / speed());
 const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.z - a.z);
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 const smoothstep = (v: number) => {
@@ -211,7 +222,11 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       to: number | number[],
       options: ValueAnimationTransition<number>,
     ) => {
-      const controls = animate(value, to, options);
+      const controls = animate(
+        value,
+        to,
+        options.duration === undefined ? options : { ...options, duration: options.duration / speed() },
+      );
       running.push(controls);
       return controls;
     };
@@ -302,7 +317,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     // One loop for every rolling ball, running only while one is.
     const tick = (now: number) => {
-      const dt = Math.min((now - lastFrame) / 1000, 1 / 30);
+      const dt = Math.min((now - lastFrame) / 1000, 1 / 30) * speed();
       lastFrame = now;
       rolls.forEach((roll) => advance(roll, dt));
       raf = rolls.size > 0 ? requestAnimationFrame(tick) : null;
@@ -338,7 +353,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       const touch = TIP_TOUCH * ballScale - TIP_REST;
 
       await run(shot, DRAWBACK, { duration: 0.42, ease: [0.33, 0, 0.2, 1] });
-      await sleep(90);
+      await pause(90);
       if (id !== shotId) return false;
 
       let hit = false;
@@ -353,7 +368,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       if (id !== shotId) return false;
 
       // follow-through hold
-      await sleep(180);
+      await pause(180);
       return id === shotId;
     };
 
@@ -592,7 +607,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
       await lit;
       if (id !== shotId) return;
-      await sleep(CUE_PAUSE * 1000);
+      await pause(CUE_PAUSE * 1000);
       if (id !== shotId) return;
       await run(shot, 0, { duration: CUE_ENTER, ease: CUE_ENTER_EASE });
     };

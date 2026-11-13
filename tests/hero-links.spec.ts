@@ -26,28 +26,32 @@ const emptyWidth = (link: Locator) =>
     return el.getBoundingClientRect().width - range.getBoundingClientRect().width;
   });
 
-for (const width of WIDTHS) {
-  test(`hero links are clickable at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+test("hero links are clickable at every width", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
 
-    for (const { name, href } of LINKS) {
-      const link = page.getByRole("link", { name });
-      await expect(link).toHaveCount(1);
-      await expect(link).toHaveAttribute("href", href);
+  for (const width of WIDTHS) {
+    await test.step(`at ${width}px`, async () => {
+      await page.setViewportSize({ width, height: 900 });
 
-      // Fails if another element would receive the click.
-      await link.click({ trial: true });
+      for (const { name, href } of LINKS) {
+        const link = page.getByRole("link", { name });
+        await expect.soft(link).toHaveCount(1);
+        await expect.soft(link).toHaveAttribute("href", href);
 
-      const box = await link.boundingBox();
-      expect(box).not.toBeNull();
-      expect(box!.x).toBeGreaterThanOrEqual(0);
-      expect(box!.x + box!.width).toBeLessThanOrEqual(width);
-      expect(await hitHeight(link)).toBeGreaterThanOrEqual(MIN_HIT_HEIGHT);
-      expect(await emptyWidth(link)).toBeLessThanOrEqual(1);
-    }
-  });
-}
+        // Fails if another element would receive the click.
+        await link.click({ trial: true });
+
+        const box = await link.boundingBox();
+        expect(box).not.toBeNull();
+        expect.soft(box!.x).toBeGreaterThanOrEqual(0);
+        expect.soft(box!.x + box!.width).toBeLessThanOrEqual(width);
+        expect.soft(await hitHeight(link)).toBeGreaterThanOrEqual(MIN_HIT_HEIGHT);
+        expect.soft(await emptyWidth(link)).toBeLessThanOrEqual(1);
+      }
+    });
+  }
+});
 
 test("the calendar file is served with the event's start time", async ({ request }) => {
   const response = await request.get("/stride-2026.ics");
