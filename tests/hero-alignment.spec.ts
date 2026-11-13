@@ -12,17 +12,34 @@ const contentLeft = (page: Page) =>
     .first()
     .evaluate((el) => el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft));
 
-test("hero text lines up with the page content from 1280px up", async ({ page }) => {
+test("hero text lines up with the page content at 1280px", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/");
 
-  for (const width of [1280, 1281, 1440, 1920, 2560]) {
-    await test.step(`at ${width}px`, async () => {
+  expect(Math.abs((await heroTextLeft(page)) - (await contentLeft(page)))).toBeLessThanOrEqual(0.5);
+});
+
+// Above 1280 the hero is a frame up to 1680px wide (--hero-frame in
+// globals.css): the text holds the frame's 120px left margin instead of
+// following the page content, and past 1680 the frame is centered.
+const FRAME_LEFTS = [
+  { width: 1281, left: 120 },
+  { width: 1440, left: 120 },
+  { width: 1500, left: 120 },
+  { width: 1680, left: 120 },
+  { width: 1920, left: 240 },
+  { width: 2560, left: 560 },
+];
+
+test("hero text holds 120px inside the hero frame above 1280px", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+
+  for (const { width, left } of FRAME_LEFTS) {
+    await test.step(`${left}px at ${width}px`, async () => {
       await page.setViewportSize({ width, height: 900 });
 
-      expect
-        .soft(Math.abs((await heroTextLeft(page)) - (await contentLeft(page))))
-        .toBeLessThanOrEqual(0.5);
+      expect.soft(Math.abs((await heroTextLeft(page)) - left)).toBeLessThanOrEqual(0.5);
     });
   }
 });
