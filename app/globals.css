@@ -300,7 +300,9 @@ body {
 }
 
 /* PoolShot moves the balls (and their shadows) from JS: --bx/--bz offset them
-   on the felt (world px), --bs scales them and --spin turns the face (deg).
+   on the felt (world px), --bs scales them and --spin turns the white ball's
+   face (deg). The blue and eight balls roll for real instead: --spot moves
+   their spot over the sphere (an SVG matrix, none at rest).
    Balls never change shape: billiard balls are rigid. */
 .table-ball {
   transform: translate(
@@ -312,6 +314,10 @@ body {
 
 .table-ball-spin {
   transform: rotate(calc(var(--spin, 0) * 1deg));
+}
+
+.table-ball-spot {
+  transform: var(--spot, none);
 }
 
 /* "Click me" beside the smiley (see TableScene.tsx, Figma 9346:258). Its origin

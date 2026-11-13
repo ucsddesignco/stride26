@@ -114,6 +114,34 @@ type BallVar = "--bx" | "--bz" | "--bs" | "--spin";
 const BALL_VARS: BallVar[] = ["--bx", "--bz", "--bs", "--spin"];
 const CUE_VARS = ["--ox", "--oz", "--hx", "--hz", "--hs"];
 
+// The white ball's face turns flat on the screen rather than rolling, so it never
+// rolls out of sight. At the true rate (distance / radius) it whirled like a
+// pinwheel; this slows it so it reads as a gentle turn.
+const SPIN_SCALE = 0.3;
+
+// 3×3 rotation matrices, row-major, in world axes (x right, z toward the
+// viewer, h up; see TableScene.tsx).
+type Mat3 = number[];
+const IDENTITY: Mat3 = [1, 0, 0, 0, 1, 0, 0, 0, 1];
+const mul3 = (a: Mat3, b: Mat3): Mat3 => {
+  const out = new Array<number>(9);
+  for (let r = 0; r < 3; r++)
+    for (let c = 0; c < 3; c++)
+      out[r * 3 + c] = a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c];
+  return out;
+};
+// Rotation by `angle` around the unit axis (kx, kz, kh) (Rodrigues).
+const axisAngle = (kx: number, kz: number, kh: number, angle: number): Mat3 => {
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  const t = 1 - cos;
+  return [
+    cos + kx * kx * t, kx * kz * t - kh * sin, kx * kh * t + kz * sin,
+    kz * kx * t + kh * sin, cos + kz * kz * t, kz * kh * t - kx * sin,
+    kh * kx * t - kz * sin, kh * kz * t + kx * sin, cos + kh * kh * t,
+  ];
+};
+
 type BallSpec = typeof cueBall;
 type SceneBall = {
   spec: BallSpec;
@@ -121,7 +149,11 @@ type SceneBall = {
   shadow: SVGElement;
   x: number;
   z: number;
+  /** white only: the flat turn of its face (deg) */
   spin: number;
+  /** blue and eight: the ball's 3D orientation, and its off-white spot */
+  orient: Mat3;
+  spot: { el: SVGCircleElement; u: number; v: number } | null;
 };
 
 type Leg = Point & { v0: number; v1: number; fade: "in" | "out" | "dark" | "solid" };
@@ -188,7 +220,12 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     const makeBall = (spec: BallSpec): SceneBall | null => {
       const el = root.querySelector<SVGElement>(`[data-ball="${spec.kind}"]`);
       const shadow = root.querySelector<SVGElement>(`[data-ball-shadow="${spec.kind}"]`);
-      return el && shadow ? { spec, el, shadow, x: spec.x, z: spec.z, spin: 0 } : null;
+      // the spot's resting center in ball radii, read from the art itself
+      const spotEl = el?.querySelector<SVGCircleElement>("[data-ball-spot]");
+      const spot = spotEl ? { el: spotEl, u: spotEl.cx.baseVal.value, v: spotEl.cy.baseVal.value } : null;
+      return el && shadow
+        ? { spec, el, shadow, x: spec.x, z: spec.z, spin: 0, orient: IDENTITY, spot }
+        : null;
     };
     const white = makeBall(cueBall);
     const blue = makeBall(blueBall);
@@ -269,16 +306,58 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       ball.shadow.style.opacity = String(v);
     };
 
+    // Draws a ball's spot where its orientation has rolled it. The spot is a disc
+    // on the sphere around the point that, at rest, projects to its art center.
+    // On a unit sphere, (x, z, h) shows at (x, z·s − h·c) and faces the camera by
+    // z·c + h·s. The disc is drawn as the art's circle moved to the new center and
+    // squeezed toward the ball's center by how much it faces the camera compared
+    // with at rest, so an unrolled ball is drawn exactly as the art.
+    const drawSpot = (ball: SceneBall) => {
+      if (!ball.spot) return;
+      const { el, u: u0, v: v0 } = ball.spot;
+      const s = view.squash;
+      const c = Math.sqrt(Math.max(0, 1 - s * s));
+      const w0 = Math.sqrt(Math.max(0, 1 - u0 * u0 - v0 * v0));
+      const p0 = [u0, v0 * s + w0 * c, -v0 * c + w0 * s];
+      const m = ball.orient;
+      const [px, pz, ph] = [0, 1, 2].map(
+        (r) => m[r * 3] * p0[0] + m[r * 3 + 1] * p0[1] + m[r * 3 + 2] * p0[2],
+      );
+      const u = px;
+      const v = pz * s - ph * c;
+      const k = Math.max(0, (pz * c + ph * s) / w0); // 0 once it faces away
+      const len = Math.hypot(u, v);
+      const nx = len > 1e-6 ? u / len : 1;
+      const ny = len > 1e-6 ? v / len : 0;
+      const a = 1 + (k - 1) * nx * nx;
+      const b = (k - 1) * nx * ny;
+      const d = 1 + (k - 1) * ny * ny;
+      el.style.setProperty(
+        "--spot",
+        `matrix(${a}, ${b}, ${b}, ${d}, ${u - a * u0 - b * v0}, ${v - b * u0 - d * v0})`,
+      );
+    };
+
     const placeBall = ({ x, z }: Point, ball: SceneBall) => {
       const radius = radiusAt(ball.spec, z);
-      const rolled = Math.hypot(x - ball.x, z - ball.z);
-      ball.spin += (Math.sign(x - ball.x) || 1) * (rolled / radius) * (180 / Math.PI);
+      const dx = x - ball.x;
+      const dz = z - ball.z;
+      const rolled = Math.hypot(dx, dz);
+      if (ball.spot) {
+        // rolling without slipping: turn by rolled / radius around the table-plane
+        // axis at right angles to the step, so the top moves the way the ball does
+        if (rolled > 0)
+          ball.orient = mul3(axisAngle(-dz / rolled, dx / rolled, 0, rolled / radius), ball.orient);
+        drawSpot(ball);
+      } else {
+        ball.spin += (Math.sign(dx) || 1) * (rolled / radius) * (180 / Math.PI) * SPIN_SCALE;
+        setBall(ball, "--spin", ball.spin);
+      }
       ball.x = x;
       ball.z = z;
       setBall(ball, "--bx", x - ball.spec.x);
       setBall(ball, "--bz", z - ball.spec.z);
       setBall(ball, "--bs", radius / baseRadius(ball.spec));
-      setBall(ball, "--spin", ball.spin);
     };
 
     const putAway = (ball: SceneBall) => {
@@ -564,6 +643,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         ball.x = ball.spec.x;
         ball.z = ball.spec.z;
         ball.spin = 0;
+        ball.orient = IDENTITY;
+        ball.spot?.el.style.removeProperty("--spot");
         for (const el of [ball.el, ball.shadow]) {
           BALL_VARS.forEach((name) => el.style.removeProperty(name));
           el.style.removeProperty("opacity");

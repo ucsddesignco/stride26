@@ -101,7 +101,7 @@ function BallArt({ kind }: { kind: Ball["kind"] }) {
       return (
         <>
           <circle r="1" fill="#F4F48F" />
-          <g clipPath="url(#table-yellow-ball)">
+          <g clipPath="url(#table-ball-clip)">
             <g transform="rotate(15.42)">
               <rect x="-1.45" y="-1.75" width="0.9" height="3.5" fill="#FCFFF2" />
               <rect x="0.55" y="-1.75" width="0.9" height="3.5" fill="#FCFFF2" />
@@ -113,7 +113,10 @@ function BallArt({ kind }: { kind: Ball["kind"] }) {
       return (
         <>
           <circle r="1" fill="#A4CDF9" />
-          <circle cx="-0.280" cy="-0.095" r="0.4953" fill="#FCFFF2" />
+          {/* the spot rolls with the ball (PoolShot writes --spot) */}
+          <g clipPath="url(#table-ball-clip)">
+            <circle data-ball-spot className="table-ball-spot" cx="-0.280" cy="-0.095" r="0.4953" fill="#FCFFF2" />
+          </g>
         </>
       );
     case "white":
@@ -136,7 +139,9 @@ function BallArt({ kind }: { kind: Ball["kind"] }) {
       return (
         <>
           <circle r="1" fill="black" />
-          <circle cx="0.238" cy="-0.210" r="0.4952" fill="#FCFFF2" />
+          <g clipPath="url(#table-ball-clip)">
+            <circle data-ball-spot className="table-ball-spot" cx="0.238" cy="-0.210" r="0.4952" fill="#FCFFF2" />
+          </g>
         </>
       );
   }
@@ -177,7 +182,8 @@ export default function TableScene() {
           <clipPath id="table-felt">
             <circle r={TABLE_RADIUS} />
           </clipPath>
-          <clipPath id="table-yellow-ball">
+          {/* a ball's unit circle: keeps stripes and rolling spots on the ball */}
+          <clipPath id="table-ball-clip">
             <circle r="1" />
           </clipPath>
         </defs>
