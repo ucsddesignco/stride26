@@ -289,12 +289,14 @@ body {
   --edge-slope: 0.70845;
 }
 
-.table-plane {
+.table-plane,
+.table-on-screen {
   transform: scale(1, var(--s));
 }
 
 /* Ball radius eases from its tablet size to its top-down size */
 .table-ball,
+.table-ball-felt,
 .table-ball-haze,
 .table-ball-shadow,
 .table-hint,
@@ -312,6 +314,7 @@ body {
    drawn again in the cone's haze by a twin that follows the same variables
    (.table-ball-haze), clipped to the cone's shape on screen. */
 .table-ball,
+.table-ball-felt,
 .table-ball-haze {
   transform: translate(
       calc((var(--x) + var(--bx, 0)) * 1px),
@@ -332,10 +335,20 @@ body {
   pointer-events: none;
 }
 
-/* the cone's haze over black, as the cone itself is drawn */
+/* the cone's haze over black, as the cone itself is drawn: opaque shapes in a
+   layer at the cone's opacity (reduced motion fades .table-ball-haze inside it) */
+.table-ball-haze-layer {
+  opacity: var(--cone-opacity);
+}
+
+.table-ball-felt,
 .table-ball-haze {
-  fill-opacity: var(--cone-opacity);
   pointer-events: none;
+}
+
+/* the whole ball, hazed as it goes behind the cone past the back rim */
+.table-ball-behind {
+  fill-opacity: var(--behind, 0);
 }
 
 /* "Click me" beside the smiley (see TableScene.tsx, Figma 9346:258). Its origin
@@ -387,8 +400,10 @@ body {
    camera tilts up, instead of ballooning once the felt stops being squashed.
    The offset is scaled by --bs like the shape, so as a ball moves back the
    shadow shrinks with it and keeps the same gap, moving rigidly with the
-   ball. */
+   ball. --lit fades the shadow as the ball leaves the light (reduced
+   motion's inline opacity overrides it). */
 .table-ball-shadow {
+  opacity: var(--lit, 1);
   transform: translate(
       calc((var(--x) + var(--bx, 0) + var(--r) * (0.25 + (var(--sx) - 0.25) * var(--p)) * var(--bs, 1)) * 1px),
       calc((var(--z) + var(--bz, 0) + var(--r) * var(--sz) * var(--unsquash) * var(--p) * var(--bs, 1)) * 1px)

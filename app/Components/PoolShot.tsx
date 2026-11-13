@@ -62,11 +62,14 @@ const SECOND_EXIT_SPEED = 1138;
 const GONE_SPEED = 140; // px/s a struck ball still has as it leaves the light
 const EIGHT_GONE_SPEED = 640; // the eight ball is hit much harder, and is still flying as it leaves
 
-// Balls go dark by leaving the lamp's light (see drawLight), not by fading.
-// They turn, are hidden and reappear this far past the rim: more than the
-// largest ball's radius (58, top-down) plus the lamp's 12.6 offset from the
-// table's center, so every part of the ball is out of the light by then.
-const OFF_TABLE_PAST = 80;
+// Balls go dark by leaving the lamp's light (see drawLight), not by fading,
+// or, in the table's front half, slide behind the front rim. They turn, are
+// hidden and reappear this far past the rim. The largest ball
+// (58, top-down) is all dark once its center is 541 from the lamp, and its
+// dark side has ramped to black and it's hidden DARK_RAMP (40) further on, at
+// 581. Past the rim by this much, a ball is at least 581.9 from the lamp (it
+// hangs 12.6 off the table's center), so the ramp has always ended by then.
+const OFF_TABLE_PAST = 86;
 // The white ball rolls on until its shadow is off the felt too (see shadowClear):
 // points sampled around the shadow's outline, and how far past the rim they must be.
 const SHADOW_STEPS = 32;
@@ -78,6 +81,12 @@ const SQUASH_TABLET = 0.2288;
 const CONE_SIDE = Math.hypot(LAMP_H, TABLE_RADIUS);
 // segments in the drawn edge of a ball's light
 const EDGE_STEPS = 20;
+// A ball's unlit side over the felt is its own colour times this, not black: a
+// black ball over the lit felt read as a hole. Off the felt it's black, lost in
+// the page. Once all of it is dark, the dim side dims to black over DARK_RAMP
+// world px further from the lamp, and then the ball is hidden.
+const AMBIENT = 0.12;
+const DARK_RAMP = 40;
 
 // Cue travel along its axis in ball radii (+ draws back toward the butt). It
 // rests TIP_REST radii from the ball's center, aimed 0.32 radii above it, so the
@@ -133,7 +142,8 @@ const speedBefore = (endSpeed: number, length: number) =>
   Math.sqrt(endSpeed * endSpeed + 2 * FRICTION * length);
 
 type BallVar = "--bx" | "--bz" | "--bs" | "--spin";
-const BALL_VARS: BallVar[] = ["--bx", "--bz", "--bs", "--spin"];
+// --lit is on the shadow only and --behind on the haze twin only (see drawLight)
+const BALL_VARS = ["--bx", "--bz", "--bs", "--spin", "--lit", "--behind"];
 const CUE_VARS = ["--ox", "--oz", "--hx", "--hz", "--hs"];
 
 // The white ball's face turns flat on the screen rather than rolling, so it never
@@ -171,8 +181,14 @@ type SceneBall = {
   shadow: SVGElement;
   /** the twin that draws the unlit side in the cone's haze (see TableScene) */
   haze: SVGElement;
-  /** the unlit side: in the ball, and in its haze twin */
+  /** the twin that draws the unlit side dim where it's over the felt */
+  feltTwin: SVGElement;
+  /** the unlit side: in the ball (black), its felt twin (dim) and its haze twin */
   dark: SVGPathElement[];
+  /** the ball's colour as RGB 0–255, read from its art (its unlit side is a dim copy) */
+  base: number[];
+  /** the felt twin's unlit side's current fill */
+  fill: string;
   x: number;
   z: number;
   /** white only: the flat turn of its face (deg) */
@@ -192,67 +208,52 @@ type Roll = {
   done: () => void;
 };
 
+// How far a ball's center is outside the light cone's side, in its radii
+// (− inside), `reach` from under the lamp. `radius` is the ball's, and its
+// center's height: the cone is narrower up there.
+const lampOut = (reach: number, radius: number) =>
+  ((reach - TABLE_RADIUS * (1 - radius / LAMP_H)) * LAMP_H) / CONE_SIDE / radius;
+
+// all of the ball, once it's all dark (the clip trims it to the outline)
+const ALL_DARK = "M-2,-2H2V2H-2Z";
+
 // The part of a ball out of the lamp's light, as a path on its unit circle
-// (clipped just past it): "" while it's all lit, null once all you can see is dark.
-// The light is a cone from the lamp down to the felt, and over a ball its side
-// is near enough a plane, so the edge of the light is where that plane cuts the
-// sphere: a circle, which shows as an ellipse, like the moon's terminator.
-// Camera (see TableScene): the screen's x and y and the way toward the viewer
-// are (1, 0, 0), (0, s, −c) and (0, c, s) in world (x, z, h); this holds
-// top-down (c = 0) too. `radius` is the ball's, and its center's height.
-function darkSide(x: number, z: number, radius: number, s: number, c: number): string | null {
-  const dx = x - LAMP_X;
-  const reach = Math.hypot(dx, z);
-  // how far the ball's center is outside the cone's side, in radii (− inside)
-  const out = ((reach - TABLE_RADIUS * (1 - radius / LAMP_H)) * LAMP_H) / CONE_SIDE / radius;
+// (clipped just past it): "" while it's all lit. It's drawn like a phase of the
+// moon: the dark side is the half of the outline facing away from the light's
+// center on screen, and the light's edge is a half-ellipse that always ends on
+// the outline, sweeping across the ball as `out` goes from −1 (all lit) to 1
+// (all dark). `s` is the felt's squash on screen (see TableScene).
+function darkSide(x: number, z: number, out: number, s: number): string {
   if (out <= -1) return "";
-  if (out >= 1) return null;
-  // The side's outward normal n, in screen axes: (a1, a2) on screen, nv toward
-  // the viewer. On the unit sphere a point q is dark when n · q > d.
-  const d = -out;
-  const rx = reach > 1e-6 ? dx / reach : 1;
-  const rz = reach > 1e-6 ? z / reach : 0;
-  const nx = (rx * LAMP_H) / CONE_SIDE;
-  const nz = (rz * LAMP_H) / CONE_SIDE;
-  const nh = TABLE_RADIUS / CONE_SIDE;
-  const a1 = nx;
-  const a2 = nz * s - nh * c;
-  const nv = nz * c + nh * s;
-  const A = Math.hypot(a1, a2);
-  // Work in a frame turned so the dark side is toward +X on screen.
-  const ex = A > 1e-6 ? a1 / A : 1;
-  const ey = A > 1e-6 ? a2 / A : 0;
+  if (out >= 1) return ALL_DARK;
+  // Work in a frame turned so the dark side is toward +X on screen: away from
+  // the light's center, so the left rim darkens the left side, the front rim
+  // the bottom and the back rim the top.
+  const vx = x - LAMP_X;
+  const vy = z * s;
+  const length = Math.hypot(vx, vy);
+  const ex = length > 1e-6 ? vx / length : 1;
+  const ey = length > 1e-6 ? vy / length : 0;
   const pt = (X: number, Y: number) =>
     `${(X * ex - Y * ey).toFixed(4)},${(X * ey + Y * ex).toFixed(4)}`;
-  // The edge circle: center d·n, radius rho. At angle θ it shows at
-  // (A·d − rho·nv·sin θ, rho·cos θ), and faces the viewer by nv·d + rho·A·sin θ.
-  const rho = Math.sqrt(1 - d * d);
-  const edge = (θ: number) => pt(A * d - rho * nv * Math.sin(θ), rho * Math.cos(θ));
-
-  if (A > Math.abs(d)) {
-    // The edge meets the ball's outline: draw its front half, between the two
-    // points where it turns away, then close round the outline's dark side
-    // (from outside the circle; the clip trims it to the outline).
-    const from = Math.asin(clamp((-nv * d) / (rho * A), -1, 1));
-    const reachOutline = Math.acos(clamp(d / A, -1, 1));
-    const points: string[] = [];
-    for (let i = 0; i <= EDGE_STEPS; i++)
-      points.push(edge(from + ((Math.PI - 2 * from) * i) / EDGE_STEPS));
-    for (const k of [-1, -0.5, 0, 0.5, 1]) {
-      const a = reachOutline * k;
-      points.push(pt(2 * Math.cos(a), 2 * Math.sin(a)));
-    }
-    return `M${points.join("L")}Z`;
+  // The edge from the outline's bottom to its top, (d·sin θ, cos θ); then
+  // close round the outline's dark side from outside the circle.
+  const d = -out;
+  const points: string[] = [];
+  for (let i = 0; i <= EDGE_STEPS; i++) {
+    const θ = (Math.PI * i) / EDGE_STEPS;
+    points.push(pt(d * Math.sin(θ), Math.cos(θ)));
   }
-  // The edge doesn't reach the outline: it's a whole ellipse on the front, or
-  // all on the back, and the outline is all lit (d > 0) or all dark (d < 0).
-  const facing = nv * d > 0;
-  if (!facing) return d > 0 ? "" : null;
-  const ring: string[] = [];
-  for (let i = 0; i < 2 * EDGE_STEPS; i++) ring.push(edge((Math.PI * i) / EDGE_STEPS));
-  const ellipse = `M${ring.join("L")}Z`;
-  return d > 0 ? ellipse : `M-2,-2H2V2H-2Z${ellipse}`;
+  for (const k of [-0.5, -0.25, 0, 0.25, 0.5]) {
+    const a = Math.PI * k;
+    points.push(pt(2 * Math.cos(a), 2 * Math.sin(a)));
+  }
+  return `M${points.join("L")}Z`;
 }
+
+// "#RRGGBB" or "black" as RGB 0–255
+const parseColour = (colour: string | null) =>
+  colour?.startsWith("#") ? [1, 3, 5].map((i) => parseInt(colour.slice(i, i + 2), 16)) : [0, 0, 0];
 
 export default function PoolShot({ children }: { children: ReactNode }) {
   const scope = useRef<HTMLDivElement>(null);
@@ -281,14 +282,20 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       const spotEl = el?.querySelector<SVGCircleElement>("[data-ball-spot]");
       const spot = spotEl ? { el: spotEl, u: spotEl.cx.baseVal.value, v: spotEl.cy.baseVal.value } : null;
       const haze = root.querySelector<SVGElement>(`[data-ball-haze="${spec.kind}"]`);
-      const dark = [el, haze].map((g) => g?.querySelector<SVGPathElement>("[data-ball-dark]"));
-      if (!el || !shadow || !haze || !dark[0] || !dark[1]) return null;
+      const feltTwin = root.querySelector<SVGElement>(`[data-ball-felt="${spec.kind}"]`);
+      const dark = [el, feltTwin, haze].map((g) =>
+        g?.querySelector<SVGPathElement>("[data-ball-dark]"),
+      );
+      if (!el || !shadow || !haze || !feltTwin || dark.some((d) => !d)) return null;
       return {
         spec,
         el,
         shadow,
         haze,
+        feltTwin,
         dark: dark as SVGPathElement[],
+        base: parseColour(el.querySelector(".table-ball-spin > circle")?.getAttribute("fill") ?? null),
+        fill: "",
         x: spec.x,
         z: spec.z,
         spin: 0,
@@ -402,29 +409,46 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       return { x: from.x + dir.x * reach, z: from.z + dir.z * reach };
     };
 
+    const ballParts = (ball: SceneBall) => [ball.el, ball.feltTwin, ball.haze, ball.shadow];
     const setBall = (ball: SceneBall, name: BallVar, v: number) => {
-      ball.el.style.setProperty(name, String(v));
-      ball.haze.style.setProperty(name, String(v));
-      ball.shadow.style.setProperty(name, String(v));
+      for (const el of ballParts(ball)) el.style.setProperty(name, String(v));
     };
     // reduced motion only: with full motion, balls go dark by leaving the light
     const setBallOpacity = (ball: SceneBall, v: number) => {
-      for (const el of [ball.el, ball.haze, ball.shadow]) el.style.opacity = String(v);
+      for (const el of ballParts(ball)) el.style.opacity = String(v);
     };
 
-    // Shades the ball's side out of the light. Once all you can see is dark, the
-    // ball and its haze twin are hidden instead: they'd look the same, but the
-    // ball's edge would show through the dark side's as a faint ring.
+    // Shades the ball's side out of the light: black, and over the felt a dim
+    // copy of its colour (the felt twin), which dims to black once all of it is
+    // dark. The ball and its twins are then hidden: they'd look the same, but the ball's edge would show through the
+    // dark side's as a faint ring. Its shadow fades with how lit it is (--lit),
+    // and past the back rim the haze twin covers the whole ball (--behind),
+    // since it's behind the cone of light.
+    // In the table's front half the lamp doesn't apply: the ball stays lit and
+    // the front rim's clip hides it as it goes over (see TableScene).
     const drawLight = (ball: SceneBall, radius: number) => {
-      const s = view.squash;
-      const path = darkSide(ball.x, ball.z, radius, s, Math.sqrt(Math.max(0, 1 - s * s)));
-      const visibility = path === null ? "hidden" : "";
+      const reach = Math.hypot(ball.x - LAMP_X, ball.z);
+      const out = ball.z >= 0 ? -Infinity : lampOut(reach, radius);
+      // world px further from the lamp than where it's all dark
+      const past = ((out - 1) * radius * CONE_SIDE) / LAMP_H;
+      const visibility = past >= DARK_RAMP ? "hidden" : "";
       ball.el.style.visibility = visibility;
+      ball.feltTwin.style.visibility = visibility;
       ball.haze.style.visibility = visibility;
-      const d = path ?? "";
+      const d = darkSide(ball.x, ball.z, out, view.squash);
       ball.dark.forEach((el) => {
         if (el.getAttribute("d") !== d) el.setAttribute("d", d);
       });
+      const level = AMBIENT * clamp(1 - past / DARK_RAMP, 0, 1);
+      const fill = `rgb(${ball.base.map((v) => Math.round(v * level)).join(",")})`;
+      if (fill !== ball.fill) {
+        ball.fill = fill;
+        ball.dark[1].style.fill = fill;
+      }
+      ball.shadow.style.setProperty("--lit", String(clamp((1 - out) / 2, 0, 1)));
+      const behind =
+        ball.z < 0 ? clamp((reach - (TABLE_RADIUS - radius)) / (2 * radius), 0, 1) : 0;
+      ball.haze.style.setProperty("--behind", String(behind));
     };
 
     // Draws a ball's spot where its orientation has rolled it. The spot is a disc
@@ -483,7 +507,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     };
 
     const putAway = (ball: SceneBall) => {
-      for (const el of [ball.el, ball.haze, ball.shadow]) el.style.visibility = "hidden";
+      for (const el of ballParts(ball)) el.style.visibility = "hidden";
     };
 
     const advance = (roll: Roll, dt: number) => {
@@ -759,7 +783,9 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         ball.orient = IDENTITY;
         ball.spot?.el.style.removeProperty("--spot");
         ball.dark.forEach((el) => el.removeAttribute("d"));
-        for (const el of [ball.el, ball.haze, ball.shadow]) {
+        ball.dark[1].style.removeProperty("fill");
+        ball.fill = "";
+        for (const el of ballParts(ball)) {
           BALL_VARS.forEach((name) => el.style.removeProperty(name));
           el.style.removeProperty("opacity");
           el.style.removeProperty("visibility");

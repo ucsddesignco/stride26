@@ -26,6 +26,10 @@ export const LAMP_H = 812.555 / 0.97347; // ≈ 834.70
 // a clip that tints a ball's unlit side where it sits in front of the haze.
 const CONE_POLYGON = `-50.5,-615.4 72.5,-615.4 ${TABLE_RADIUS},0 ${-TABLE_RADIUS},0`;
 const CONE_WING_LEFT = `M12.566,-812.555 C12.366,-812.268 -508.479,-64.249 ${-TABLE_RADIUS},0 L11,0 Z`;
+// The felt's front half on screen, plus everything above it between the table's
+// sides: a ball is clipped to this, so it slides behind the front rim rather
+// than going dark there (see .table-on-screen and PoolShot's drawLight).
+const FRONT_CLIP = `M${-TABLE_RADIUS},0 A${TABLE_RADIUS},${TABLE_RADIUS} 0 0 0 ${TABLE_RADIUS},0 V-100000 H${-TABLE_RADIUS} Z`;
 const CONE_WING_RIGHT = `M12.566,-812.555 C12.566,-812.555 ${TABLE_RADIUS},-64.261 ${TABLE_RADIUS},0 L11,0 Z`;
 
 type Ball = {
@@ -163,8 +167,9 @@ function BallArt({ kind }: { kind: Ball["kind"] }) {
   }
 }
 
-// A ball's unlit side on its unit circle, black or in the cone's haze colour
-// (its opacity is the cone's, see .table-ball-haze).
+// A ball's unlit side on its unit circle: black, a dim copy of the ball's
+// colour over the felt (PoolShot sets its fill), or in the cone's haze colour (its opacity is the
+// cone's, see .table-ball-haze-layer).
 function BallDark({ haze = false }: { haze?: boolean }) {
   return (
     <path
@@ -218,9 +223,17 @@ export default function TableScene() {
           </clipPath>
           {/* a ball's dark side reaches 2% past its outline, over the ball's
               antialiased edge, which would otherwise show as a faint ring; past
-              the ball it paints the black or haze already there */}
+              the ball that's a hairline of its dim colour or haze */}
           <clipPath id="table-ball-dark-clip">
             <circle r="1.02" />
+          </clipPath>
+          {/* the felt on screen (squashed like .table-plane), and the front
+              rim's clip: both in the balls' screen space */}
+          <clipPath id="table-felt-screen">
+            <circle className="table-on-screen" r={TABLE_RADIUS} />
+          </clipPath>
+          <clipPath id="table-front-clip">
+            <path className="table-on-screen" d={FRONT_CLIP} />
           </clipPath>
           {/* the cone's screen shape, moved by the same CSS as the haze below */}
           <clipPath id="table-cone-clip">
@@ -280,24 +293,43 @@ export default function TableScene() {
                 <CueArt />
               </g>
             )}
-            <g
-              aria-hidden
-              data-ball={ball.kind}
-              className={`table-ball ${ball === cueBall ? "cursor-pointer" : ""}`}
-              style={ballVars(ball)}
-            >
-              <g className="table-ball-spin">
-                <BallArt kind={ball.kind} />
+            {/* cut at the front rim on screen: a ball crossing it isn't lit by
+                the lamp, so it slides behind the rim instead */}
+            <g clipPath={ball.kind !== "yellow" ? "url(#table-front-clip)" : undefined}>
+              <g
+                aria-hidden
+                data-ball={ball.kind}
+                className={`table-ball ${ball === cueBall ? "cursor-pointer" : ""}`}
+                style={ballVars(ball)}
+              >
+                <g className="table-ball-spin">
+                  <BallArt kind={ball.kind} />
+                </g>
+                {/* the side out of the lamp's light (PoolShot writes d); empty
+                    while lit. Black, so off the felt it's lost in the page. */}
+                {ball.kind !== "yellow" && <BallDark />}
               </g>
-              {/* the side out of the lamp's light (PoolShot writes d); empty while lit */}
-              {ball.kind !== "yellow" && <BallDark />}
             </g>
+            {/* the same unlit side in a dim copy of the ball's colour, only
+                where the ball is over the felt: a black side there read as a hole */}
+            {ball.kind !== "yellow" && (
+              <g aria-hidden clipPath="url(#table-felt-screen)">
+                <g data-ball-felt={ball.kind} className="table-ball-felt" style={ballVars(ball)}>
+                  <BallDark />
+                </g>
+              </g>
+            )}
             {/* the same unlit side again in the cone's haze, shown only where the
                 ball is in front of the cone, so a ball leaving out the back fades
-                into the haze rather than turning into a black disc */}
+                into the haze rather than turning into a black disc. Past the
+                back rim the ball is behind the cone, so the disc hazes its lit
+                side too (PoolShot writes --behind). The shapes are opaque and
+                the layer carries the cone's opacity, so where they overlap the
+                haze isn't applied twice. */}
             {ball.kind !== "yellow" && (
-              <g aria-hidden clipPath="url(#table-cone-clip)">
+              <g aria-hidden clipPath="url(#table-cone-clip)" className="table-ball-haze-layer">
                 <g data-ball-haze={ball.kind} className="table-ball-haze" style={ballVars(ball)}>
+                  <circle className="table-ball-behind" r="1" fill="#FFDB9F" />
                   <BallDark haze />
                 </g>
               </g>
