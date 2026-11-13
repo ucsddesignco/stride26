@@ -98,3 +98,67 @@ for (const { width, wing, coneWidth } of CONES) {
     }
   });
 }
+
+// From 1280 to 1440 the table is pinned to the hero's right edge, so the eight
+// ball keeps the desktop frame's gap (Figma 9026:1631). Below 1280 the table is
+// placed from the center (17.5px at 1024), and from 1440 up it is again, 80px
+// further right, so the gap grows by half of any extra width.
+const eightBallGap = (page: Page) =>
+  page.evaluate(() => {
+    const hero = document.querySelector(".hero-fluid")!.getBoundingClientRect();
+    const ball = document.querySelector('[data-ball="eight"]')!.getBoundingClientRect();
+    return hero.right - ball.right;
+  });
+
+const GAPS = [
+  { width: 1024, gap: 17.5 },
+  { width: 1280, gap: 145.5 },
+  { width: 1360, gap: 145.5 },
+  { width: 1440, gap: 145.5 },
+  { width: 1920, gap: 385.5 },
+  { width: 2560, gap: 705.5 },
+];
+
+for (const { width, gap } of GAPS) {
+  test(`eight ball sits ${gap}px from the right edge at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+
+    expect(Math.abs((await eightBallGap(page)) - gap)).toBeLessThanOrEqual(1);
+  });
+}
+
+const tableLeft = (page: Page) =>
+  page.evaluate(() => parseFloat(getComputedStyle(document.querySelector(".table-scene")!).left));
+
+// The title follows the centered page content, so past 1440 the table has to
+// as well or the two drift apart on very wide screens.
+for (const width of [1440, 1920, 2560, 3040]) {
+  test(`table keeps its distance from the hero text at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+
+    const text = await page.locator("[data-hero-text]:visible").boundingBox();
+    expect(Math.abs((await tableLeft(page)) - text!.x - 831.7)).toBeLessThanOrEqual(1);
+  });
+}
+
+for (const widths of [
+  [1260, 1270, 1280, 1290, 1300],
+  [1420, 1430, 1440, 1450, 1460],
+]) {
+  test(`table doesn't jump between ${widths[0]}px and ${widths[4]}px`, async ({ page }) => {
+    const lefts: number[] = [];
+    await page.goto("/");
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: 900 });
+      lefts.push(await tableLeft(page));
+    }
+
+    // 5px per 10px of width while centered, 10px while pinned
+    lefts.slice(1).forEach((left, i) => {
+      expect(left - lefts[i]).toBeGreaterThanOrEqual(4.5);
+      expect(left - lefts[i]).toBeLessThanOrEqual(10.5);
+    });
+  });
+}

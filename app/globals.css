@@ -110,10 +110,17 @@ body {
   /* table center and scale move from the desktop to the tablet to the mobile
      frame (--t and --u are never both non-zero, so their terms just add).
      The desktop offset is 145 world px (×1.0363) left of the Figma frame's,
-     undoing the balls' shift so they land where the frame has them. */
+     undoing the balls' shift so they land where the frame has them.
+     From 1280 to 1440 the desktop pose is pinned to the right edge instead of
+     the center, so the eight ball's right edge stays 145.5px from it (the
+     frame's gap) and the cone slides 80px away from the title. Its center is
+     then 100% - 408.3px. From 1440 up it is placed from the center again, 80px
+     further right, so it stays that far from the title (which follows the
+     centered page content) however wide the window gets. clamp() meets both
+     neighbours at 1280 and 1440, so the table never jumps. */
   --k: calc(1 - 0.4572 * var(--t) + 0.0363 * var(--u));
   position: absolute;
-  left: calc(50% - 6.52px + 8.52px * var(--t) + 238.22px * var(--u));
+  left: calc(50% - 6.52px + 8.52px * var(--t) + var(--u) * clamp(238.22px, 50% - 401.78px, 318.22px));
   top: calc(615.69px - 236.69px * var(--t) + 9.89px * var(--u));
 }
 
