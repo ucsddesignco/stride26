@@ -9,7 +9,7 @@ const GAP = 0.4;
 const OFF = 0.08;
 
 type Sample = { t: number; light: number; text: number };
-type HeroWindow = Window & { heroSamples: Sample[] };
+type HeroWindow = Window & { heroSamples: Sample[]; __poolShotSpeed?: number };
 
 /** Records the light's and the visible title's opacity every frame, from the first one. */
 const sampleLight = (page: Page) =>
@@ -74,6 +74,9 @@ const expectFlicker = (samples: Sample[]) => {
   return first;
 };
 
+// Each test loads its own page, so they can run side by side.
+test.describe.configure({ mode: "parallel" });
+
 test.beforeEach(async ({ page }) => {
   await sampleLight(page);
   await page.setViewportSize({ width: 1280, height: 900 });
@@ -125,17 +128,20 @@ test("with reduced motion the light is simply on, with no flicker", async ({ pag
 });
 
 test("the table reset flickers like the intro, from dark", async ({ page }) => {
-  test.setTimeout(60_000);
+  // PoolShot's test hook: the shots only set the table up here, so play them fast
+  await page.addInitScript(() => {
+    (window as unknown as HeroWindow).__poolShotSpeed = 8;
+  });
   await page.goto("/");
-  await page.waitForSelector("[data-hero-ready]");
+  await page.locator("[data-hero-ready]").waitFor();
 
   // play both shots: presses during a shot are ignored, and one more press
   // once the table can be reset would reset it
   const cue = page.locator("[data-pool-cue]");
   await expect(async () => {
     if ((await cue.getAttribute("aria-label")) !== "Reset the table") await cue.press("Enter");
-    await expect(cue).toHaveAttribute("aria-label", "Reset the table", { timeout: 1000 });
-  }).toPass({ timeout: 40_000 });
+    await expect(cue).toHaveAttribute("aria-label", "Reset the table", { timeout: 250 });
+  }).toPass({ timeout: 20_000 });
 
   await clearSamples(page);
   await cue.press("Enter");
@@ -169,6 +175,6 @@ test("the title dot glows during the intro without keyframe warnings", async ({ 
     );
     return alphas.some((alpha) => alpha > 0.3);
   });
-  await page.waitForSelector("[data-hero-ready]");
+  await page.locator("[data-hero-ready]").waitFor();
   expect(warnings).toEqual([]);
 });
