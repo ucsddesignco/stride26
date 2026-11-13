@@ -23,11 +23,11 @@ import {
 // Two shots on a table that carries on past the light. Hovering the cue or the
 // white ball draws the cue back a little. Click the table or the
 // cue: the white ball rolls off the front-left edge, waits out of sight,
-// rolls back in at the top edge and smacks the blue ball, which
-// rolls out of the light while the white ball slows and settles on its spot. The
+// rolls back in at the top edge and smacks the blue ball full on, which
+// rolls out of the light while the white ball follows through and stops. The
 // cue then comes in from the left, and a second click sends the white ball out
-// the right edge and back in from the front, into the eight ball, which flies off
-// the back edge while the white ball settles on its spot. A further click on the
+// the right edge and back in from the front, cutting the eight ball, which flies
+// off the back edge while the white ball kicks off sideways, bends forward and stops. A further click on the
 // table cuts the light with the balls already back, flickers it on and
 // slides the cue in again, so the shots can be replayed. If the hero fully leaves
 // the viewport, everything is put back unseen so HeroIntro can replay.
@@ -44,14 +44,18 @@ const unit = (x: number, z: number): Point => {
   return { x: x / length, z: z / length };
 };
 
-// Where the white ball heads on each shot. Each exit is along the cue, and each
-// entry is also the line the struck ball leaves on: a head-on hit sends it
-// straight on. There's no wall: off the table the ball waits OFF_TABLE_TIME,
+// Where the white ball heads on each shot. Each exit is along the cue. The
+// struck ball leaves along the entry turned by the shot's cut (FIRST_CUT,
+// SECOND_CUT): 0 is a full hit, which sends it straight on. There's no wall: off the table the ball waits OFF_TABLE_TIME,
 // then is moved to the entry line and rolls in, so the pair reads as a bank.
 const FIRST_EXIT: Point = { x: -0.98439, z: 0.17602 }; // the cue's rest heading, toward the tip
 const FIRST_ENTRY = unit(0.906, 0.423);
 const SECOND_EXIT = unit(0.995, 0.1); // flat enough that the cue clears the desktop text
 const SECOND_ENTRY = unit(-0.5, -0.87); // about 120° on the table seen from above; steeper puts the white ball off the felt on a flat camera
+// degrees the struck ball leaves off the white ball's line in; + turns it
+// toward +x (right on screen) when the line in heads up the table (−z)
+const FIRST_CUT = 0;
+const SECOND_CUT = 6;
 
 // One rolling ball's physics, in world px and seconds. The white ball's speeds
 // in are worked backward from GONE_SPEED; its speeds out from its EXIT_SPEED.
@@ -61,6 +65,10 @@ const FIRST_EXIT_SPEED = 970; // px/s the white ball still has as it goes off th
 const SECOND_EXIT_SPEED = 1138;
 const GONE_SPEED = 140; // px/s a struck ball still has as it leaves the light
 const EIGHT_GONE_SPEED = 640; // the eight ball is hit much harder, and is still flying as it leaves
+// After contact the white ball, rolling with topspin, leaves along the tangent and
+// slides this long while its velocity blends to (5/7)·tangent part + (2/7)·its
+// speed in along its line in (the 30° rule), then rolls on straight to a stop.
+const SLIDE_TIME = 0.12;
 
 // Balls go dark by leaving the lamp's light (see drawLight), not by fading,
 // or, in the table's front half, slide behind the front rim. They turn, are
@@ -120,6 +128,11 @@ const pause = (ms: number) => sleep(ms / speed());
 const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.z - a.z);
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const opposite = ({ x, z }: Point): Point => ({ x: -x, z: -z });
+// `dir` turned by `deg` on the table, + from +x toward +z
+const rotate = ({ x, z }: Point, deg: number): Point => {
+  const a = (deg * Math.PI) / 180;
+  return { x: x * Math.cos(a) - z * Math.sin(a), z: x * Math.sin(a) + z * Math.cos(a) };
+};
 
 // Where a ray from `from` along the unit `dir` crosses a circle around the table center.
 function rayToRadius(from: Point, dir: Point, radius: number): Point {
@@ -148,8 +161,10 @@ const CUE_VARS = ["--ox", "--oz", "--hx", "--hz", "--hs"];
 
 // The white ball's face turns flat on the screen rather than rolling, so it never
 // rolls out of sight. At the true rate (distance / radius) it whirled like a
-// pinwheel; this slows it so it reads as a gentle turn.
+// pinwheel; this slows it so it reads as a gentle turn. After contact it's
+// slow, so it turns at the true rate (AFTER_CONTACT_SPIN) and reads as rolling.
 const SPIN_SCALE = 0.3;
+const AFTER_CONTACT_SPIN = 1;
 
 // 3×3 rotation matrices, row-major, in world axes (x right, z toward the
 // viewer, h up; see TableScene.tsx).
@@ -193,6 +208,8 @@ type SceneBall = {
   z: number;
   /** white only: the flat turn of its face (deg) */
   spin: number;
+  /** white only: its turn as a share of the true rolling rate */
+  spinRate: number;
   /** blue and eight: the ball's 3D orientation, and its off-white spot */
   orient: Mat3;
   spot: { el: SVGCircleElement; u: number; v: number } | null;
@@ -200,12 +217,64 @@ type SceneBall = {
 
 // One straight roll to (x, z), from v0 to v1 px/s.
 type Leg = Point & { v0: number; v1: number };
+// Any motion: where the ball is `t` s in, for `duration` s.
+type Path = { duration: number; at: (t: number) => Point };
 type Roll = {
   ball: SceneBall;
-  leg: Leg;
+  path: Path;
   time: number;
-  from: Point;
   done: () => void;
+};
+
+// A leg from `from`, slowing evenly from v0 to v1.
+const legPath = (from: Point, leg: Leg): Path => {
+  const length = distance(from, leg);
+  const duration = length > 0 ? (2 * length) / (leg.v0 + leg.v1) : 0;
+  return {
+    duration,
+    at: (t) => {
+      if (t >= duration) return { x: leg.x, z: leg.z };
+      const f = (leg.v0 * t + ((leg.v1 - leg.v0) / (2 * duration)) * t * t) / length;
+      return { x: from.x + (leg.x - from.x) * f, z: from.z + (leg.z - from.z) * f };
+    },
+  };
+};
+
+// The white ball just after contact at `from`, coming in along unit `u` at `v`
+// with the struck ball leaving along unit `n`: it leaves along the tangent at
+// v·sin(cut), slides SLIDE_TIME blending linearly to the rolling velocity Vf,
+// then rolls straight along Vf under FRICTION to a stop.
+const afterContact = (from: Point, u: Point, n: Point, v: number) => {
+  const along = u.x * n.x + u.z * n.z; // cos(cut)
+  const tx = u.x - along * n.x;
+  const tz = u.z - along * n.z;
+  const tLen = Math.hypot(tx, tz);
+  const sin = tLen; // |u − (u·n)n| = sin(cut), with u and n unit
+  const t = tLen > 1e-9 ? { x: tx / tLen, z: tz / tLen } : { x: 0, z: 0 };
+  const v0 = { x: v * sin * t.x, z: v * sin * t.z };
+  const vf = {
+    x: (5 / 7) * v0.x + (2 / 7) * v * u.x,
+    z: (5 / 7) * v0.z + (2 / 7) * v * u.z,
+  };
+  const slide: Path = {
+    duration: SLIDE_TIME,
+    at: (time) => {
+      const τ = Math.min(time, SLIDE_TIME);
+      const k = (τ * τ) / (2 * SLIDE_TIME);
+      return {
+        x: from.x + v0.x * τ + (vf.x - v0.x) * k,
+        z: from.z + v0.z * τ + (vf.z - v0.z) * k,
+      };
+    },
+  };
+  const slideEnd = slide.at(SLIDE_TIME);
+  const speed = Math.hypot(vf.x, vf.z);
+  const rollLength = (speed * speed) / (2 * FRICTION);
+  const rest =
+    speed > 1e-9
+      ? { x: slideEnd.x + (vf.x / speed) * rollLength, z: slideEnd.z + (vf.z / speed) * rollLength }
+      : slideEnd;
+  return { slide, slideEnd, rollOut: { ...rest, v0: speed, v1: 0 }, rest };
 };
 
 // How far a ball's center is outside the light cone's side, in its radii
@@ -299,6 +368,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         x: spec.x,
         z: spec.z,
         spin: 0,
+        spinRate: SPIN_SCALE,
         orient: IDENTITY,
         spot,
       };
@@ -495,7 +565,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
           ball.orient = mul3(axisAngle(-dz / rolled, dx / rolled, 0, rolled / radius), ball.orient);
         drawSpot(ball);
       } else {
-        ball.spin += (Math.sign(dx) || 1) * (rolled / radius) * (180 / Math.PI) * SPIN_SCALE;
+        ball.spin += (Math.sign(dx) || 1) * (rolled / radius) * (180 / Math.PI) * ball.spinRate;
         setBall(ball, "--spin", ball.spin);
       }
       ball.x = x;
@@ -512,17 +582,9 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     const advance = (roll: Roll, dt: number) => {
       roll.time += dt;
-      const { leg, from } = roll;
-      const length = distance(from, leg);
-      const duration = (2 * length) / (leg.v0 + leg.v1);
-      if (roll.time < duration) {
-        const t = roll.time;
-        const s = leg.v0 * t + ((leg.v1 - leg.v0) / (2 * duration)) * t * t;
-        const f = s / length;
-        placeBall({ x: from.x + (leg.x - from.x) * f, z: from.z + (leg.z - from.z) * f }, roll.ball);
-        return;
-      }
-      placeBall(leg, roll.ball);
+      const { path } = roll;
+      placeBall(path.at(Math.min(roll.time, path.duration)), roll.ball);
+      if (roll.time < path.duration) return;
       rolls.delete(roll);
       roll.done();
     };
@@ -535,22 +597,43 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       raf = rolls.size > 0 ? requestAnimationFrame(tick) : null;
     };
 
-    const roll = (ball: SceneBall, leg: Leg) =>
+    const move = (ball: SceneBall, path: Path) =>
       new Promise<void>((done) => {
-        rolls.add({ ball, leg, time: 0, from: { x: ball.x, z: ball.z }, done });
+        rolls.add({ ball, path, time: 0, done });
         if (raf === null) {
           lastFrame = performance.now();
           raf = requestAnimationFrame(tick);
         }
       });
+    const roll = (ball: SceneBall, leg: Leg) => move(ball, legPath({ x: ball.x, z: ball.z }, leg));
 
-    // Where the white ball touches `target` on its way in along `entryDir`. Balls
-    // are drawn round on a squashed table, so they touch when they're this far apart
-    // on screen: on a flat camera, depth covers little of it.
-    const contactPoint = (target: SceneBall, entryDir: Point): Point => {
+    // Where the white ball touches `target`, sitting against it along −n, the
+    // line between the centres. Balls are drawn round on a squashed table, so they
+    // touch when they're this far apart on screen: on a flat camera, depth covers
+    // little of it.
+    const contactPoint = (target: SceneBall, n: Point): Point => {
       const onScreen = radiusAt(cueBall, target.spec.z) + baseRadius(target.spec);
-      const reach = onScreen / Math.hypot(entryDir.x, entryDir.z * view.squash);
-      return { x: target.x - entryDir.x * reach, z: target.z - entryDir.z * reach };
+      const reach = onScreen / Math.hypot(n.x, n.z * view.squash);
+      return { x: target.x - n.x * reach, z: target.z - n.z * reach };
+    };
+
+    // A shot's geometry: where the white ball meets `target` coming in along
+    // `entryDir`, the struck ball's line out n (entryDir turned by `cut`) and end,
+    // the speeds, and what the white ball does after contact.
+    const planShot = (target: SceneBall, entryDir: Point, cut: number, goneSpeed: number) => {
+      const n = rotate(entryDir, cut);
+      const contact = contactPoint(target, n);
+      const targetEnd = rayToRadius(target, n, TABLE_RADIUS + OFF_TABLE_PAST);
+      const targetSpeed = speedBefore(goneSpeed, distance(target, targetEnd));
+      const contactSpeed = targetSpeed / Math.cos((cut * Math.PI) / 180);
+      return {
+        n,
+        contact,
+        targetEnd,
+        targetSpeed,
+        contactSpeed,
+        after: afterContact(contact, entryDir, n, contactSpeed),
+      };
     };
 
     // Draw back, hold, strike. `onHit` fires the frame the tip reaches the ball,
@@ -581,27 +664,31 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     // The cue strikes and the white ball rolls off the table at `exitSpeed`, waits
     // OFF_TABLE_TIME out of sight, then is moved onto the line in and rolls into `target`.
-    // `target` rolls on along the same line out of the light, still at `goneSpeed` as
-    // it leaves, and the white ball follows slowly, stopping on the spot `target` left.
+    // `target` leaves `cut` degrees off that line, out of the light, still at
+    // `goneSpeed` as it leaves, and the white ball plays out the cut (see afterContact).
     // `settled` resolves with both balls at rest, or early if `id` goes stale.
     const bankShot = (
       id: number,
       target: SceneBall,
       exitDir: Point,
       entryDir: Point,
+      cut: number,
       exitSpeed: number,
       goneSpeed: number,
     ) => {
-      const contact = contactPoint(target, entryDir);
-      const offTable = TABLE_RADIUS + OFF_TABLE_PAST;
+      const { contact, targetEnd, targetSpeed, contactSpeed, after } = planShot(
+        target,
+        entryDir,
+        cut,
+        goneSpeed,
+      );
       const exit = shadowClear(white, exitDir, cueBall);
       const entry = shadowClear(contact, opposite(entryDir), cueBall);
-      const targetEnd = rayToRadius(target, entryDir, offTable);
-      const contactSpeed = speedBefore(goneSpeed, distance(target, targetEnd));
       const entrySpeed = speedBefore(contactSpeed, distance(entry, contact));
 
       let settled: Promise<void> = Promise.resolve();
       const struck = strike(id, () => {
+        white.spinRate = SPIN_SCALE;
         settled = (async () => {
           await roll(white, { ...exit, v0: speedBefore(exitSpeed, distance(white, exit)), v1: exitSpeed });
           if (id !== shotId) return;
@@ -613,11 +700,15 @@ export default function PoolShot({ children }: { children: ReactNode }) {
           placeBall(entry, white);
           await roll(white, { ...contact, v0: entrySpeed, v1: contactSpeed });
           if (id !== shotId) return;
-          const { x, z } = target.spec;
-          const follow = speedBefore(0, distance(contact, target.spec));
+          white.spinRate = AFTER_CONTACT_SPIN;
+          const whiteDone = (async () => {
+            await move(white, after.slide);
+            if (id !== shotId) return;
+            await roll(white, after.rollOut);
+          })();
           await Promise.all([
-            roll(target, { ...targetEnd, v0: contactSpeed, v1: goneSpeed }),
-            roll(white, { x, z, v0: follow, v1: 0 }),
+            roll(target, { ...targetEnd, v0: targetSpeed, v1: goneSpeed }),
+            whiteDone,
           ]);
           if (id === shotId) putAway(target);
         })();
@@ -663,7 +754,15 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     };
 
     const firstShot = async (id: number) => {
-      const { struck, settled } = bankShot(id, blue, FIRST_EXIT, FIRST_ENTRY, FIRST_EXIT_SPEED, GONE_SPEED);
+      const { struck, settled } = bankShot(
+        id,
+        blue,
+        FIRST_EXIT,
+        FIRST_ENTRY,
+        FIRST_CUT,
+        FIRST_EXIT_SPEED,
+        GONE_SPEED,
+      );
       if (!(await struck)) return;
 
       const cueGone = pullCueAway(id, FIRST_EXIT);
@@ -682,6 +781,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         eight,
         SECOND_EXIT,
         SECOND_ENTRY,
+        SECOND_CUT,
         SECOND_EXIT_SPEED,
         EIGHT_GONE_SPEED,
       );
@@ -711,7 +811,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       await Promise.all([fadeBall(blue, 1, 0), fadeBall(white, 1, 0), fadeCue(1, 0)]);
       if (id !== shotId) return;
       putAway(blue);
-      placeBall(blueBall, white);
+      placeBall(planShot(blue, FIRST_ENTRY, FIRST_CUT, GONE_SPEED).after.rest, white);
       setBallOpacity(white, 0);
       aimCueFromLeft(SECOND_EXIT);
       await Promise.all([fadeBall(white, 0, 1), fadeCue(0, 1)]);
@@ -723,7 +823,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       await Promise.all([fadeBall(eight, 1, 0), fadeBall(white, 1, 0), fadeCue(1, 0)]);
       if (id !== shotId) return;
       putAway(eight);
-      placeBall(eightBall, white);
+      placeBall(planShot(eight, SECOND_ENTRY, SECOND_CUT, EIGHT_GONE_SPEED).after.rest, white);
       setBallOpacity(white, 0);
       await fadeBall(white, 0, 1);
       if (id === shotId) stage = "done";
@@ -780,6 +880,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         ball.x = ball.spec.x;
         ball.z = ball.spec.z;
         ball.spin = 0;
+        ball.spinRate = SPIN_SCALE;
         ball.orient = IDENTITY;
         ball.spot?.el.style.removeProperty("--spot");
         ball.dark.forEach((el) => el.removeAttribute("d"));
