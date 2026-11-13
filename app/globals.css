@@ -179,6 +179,36 @@ body {
   opacity: calc(0.21 * max(0, 1 - 1.5 * var(--t)));
 }
 
+/* The desktop cone is wider than the tablet one where it meets the nav bar.
+   Each wing (see TableScene.tsx) is scaled horizontally by --u toward the
+   tablet cone's edge on its side, the line x = --edge-x + --edge-slope * y:
+   x' = u * x + (1 - u) * (edge-x + edge-slope * y).
+   At --u = 0 the wing is flat on that edge, so tablet and mobile show the
+   polygon alone; at 1 it is the desktop outline; in between every point of
+   the edge moves linearly from one to the other. */
+.table-cone-wing {
+  transform: matrix(
+    var(--u),
+    0,
+    calc((1 - var(--u)) * var(--edge-slope)),
+    1,
+    calc((1 - var(--u)) * var(--edge-x)),
+    0
+  );
+}
+
+/* through (-508.48, 0) and (-50.5, -615.4) */
+.table-cone-wing-left {
+  --edge-x: -508.48;
+  --edge-slope: -0.744199;
+}
+
+/* through (508.48, 0) and (72.5, -615.4) */
+.table-cone-wing-right {
+  --edge-x: 508.48;
+  --edge-slope: 0.70845;
+}
+
 .table-plane {
   transform: scale(1, var(--s));
 }
