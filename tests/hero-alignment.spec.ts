@@ -12,24 +12,34 @@ const contentLeft = (page: Page) =>
     .first()
     .evaluate((el) => el.getBoundingClientRect().left + parseFloat(getComputedStyle(el).paddingLeft));
 
-for (const width of [1280, 1281, 1440, 1920, 2560]) {
-  test(`hero text lines up with the page content at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+test("hero text lines up with the page content from 1280px up", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
 
-    expect(Math.abs((await heroTextLeft(page)) - (await contentLeft(page)))).toBeLessThanOrEqual(0.5);
-  });
-}
+  for (const width of [1280, 1281, 1440, 1920, 2560]) {
+    await test.step(`at ${width}px`, async () => {
+      await page.setViewportSize({ width, height: 900 });
+
+      expect
+        .soft(Math.abs((await heroTextLeft(page)) - (await contentLeft(page))))
+        .toBeLessThanOrEqual(0.5);
+    });
+  }
+});
 
 // Figma's desktop position, up to where the content's edge takes over.
-for (const width of [1024, 1260]) {
-  test(`hero text keeps its 110px position at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+test("hero text keeps its 110px position below the content's edge", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 900 });
+  await page.goto("/");
 
-    expect(await heroTextLeft(page)).toBeCloseTo(110, 1);
-  });
-}
+  for (const width of [1024, 1260]) {
+    await test.step(`at ${width}px`, async () => {
+      await page.setViewportSize({ width, height: 900 });
+
+      expect.soft(await heroTextLeft(page)).toBeCloseTo(110, 1);
+    });
+  }
+});
 
 test("hero text doesn't jump where it hands over to the content's edge", async ({ page }) => {
   const positions: number[] = [];

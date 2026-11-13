@@ -30,18 +30,22 @@ const pose = (page: Page) =>
     };
   });
 
-for (const { width, scale, squash, sceneTop, textTop } of POSES) {
-  test(`hero takes its pose for ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+test("hero takes its pose for each width", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
 
-    const actual = await pose(page);
-    expect(Math.abs(actual.scale - scale)).toBeLessThanOrEqual(0.01);
-    expect(Math.abs(actual.squash - squash)).toBeLessThanOrEqual(0.01);
-    expect(Math.abs(actual.sceneTop - sceneTop)).toBeLessThanOrEqual(0.5);
-    expect(Math.abs(actual.textTop - textTop)).toBeLessThanOrEqual(0.5);
-  });
-}
+  for (const { width, scale, squash, sceneTop, textTop } of POSES) {
+    await test.step(`at ${width}px`, async () => {
+      await page.setViewportSize({ width, height: 900 });
+
+      const actual = await pose(page);
+      expect.soft(Math.abs(actual.scale - scale)).toBeLessThanOrEqual(0.01);
+      expect.soft(Math.abs(actual.squash - squash)).toBeLessThanOrEqual(0.01);
+      expect.soft(Math.abs(actual.sceneTop - sceneTop)).toBeLessThanOrEqual(0.5);
+      expect.soft(Math.abs(actual.textTop - textTop)).toBeLessThanOrEqual(0.5);
+    });
+  }
+});
 
 // The spotlight cone is the tablet polygon plus two wings that open out with
 // --u (globals.css). `wing` is the wings' horizontal scale; `width` is how
@@ -55,10 +59,6 @@ const CONES = [
 
 /** Width of the run of lit pixels around the cone's middle, just below the nav. */
 const coneWidthBelowNav = async (page: Page, width: number) => {
-  // the intro flickers the light on; measure once it is fully lit
-  await page.waitForFunction(
-    () => getComputedStyle(document.querySelector("[data-hero-light]")!).opacity === "1",
-  );
   const row = await page.screenshot({ clip: { x: 0, y: 82, width, height: 1 } });
   return page.evaluate(async (png) => {
     const image = new Image();
@@ -84,24 +84,34 @@ const coneWidthBelowNav = async (page: Page, width: number) => {
   }, row.toString("base64"));
 };
 
-for (const { width, wing, coneWidth } of CONES) {
-  test(`spotlight cone takes its shape for ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+test("spotlight cone takes its shape for each width", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+  // the intro flickers the light on; measure once it is fully lit
+  await page.waitForFunction(
+    () => getComputedStyle(document.querySelector("[data-hero-light]")!).opacity === "1",
+  );
 
-    const scales = await page.evaluate(() =>
-      Array.from(document.querySelectorAll(".table-cone-wing")).map(
-        (el) => new DOMMatrix(getComputedStyle(el).transform).a,
-      ),
-    );
-    expect(scales).toHaveLength(2);
-    for (const scale of scales) expect(Math.abs(scale - wing)).toBeLessThanOrEqual(0.01);
+  for (const { width, wing, coneWidth } of CONES) {
+    await test.step(`at ${width}px`, async () => {
+      await page.setViewportSize({ width, height: 900 });
 
-    if (coneWidth !== null) {
-      expect(Math.abs((await coneWidthBelowNav(page, width)) - coneWidth)).toBeLessThanOrEqual(3);
-    }
-  });
-}
+      const scales = await page.evaluate(() =>
+        Array.from(document.querySelectorAll(".table-cone-wing")).map(
+          (el) => new DOMMatrix(getComputedStyle(el).transform).a,
+        ),
+      );
+      expect.soft(scales).toHaveLength(2);
+      for (const scale of scales) expect.soft(Math.abs(scale - wing)).toBeLessThanOrEqual(0.01);
+
+      if (coneWidth !== null) {
+        expect
+          .soft(Math.abs((await coneWidthBelowNav(page, width)) - coneWidth))
+          .toBeLessThanOrEqual(3);
+      }
+    });
+  }
+});
 
 // From 1280 to 1440 the table is pinned to the hero's right edge, so the eight
 // ball keeps the desktop frame's gap (Figma 9026:1631). Below 1280 the table is
@@ -123,63 +133,79 @@ const GAPS = [
   { width: 2560, gap: 705.5 },
 ];
 
-for (const { width, gap } of GAPS) {
-  test(`eight ball sits ${gap}px from the right edge at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+test("eight ball keeps its gap from the right edge at each width", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
 
-    expect(Math.abs((await eightBallGap(page)) - gap)).toBeLessThanOrEqual(1);
-  });
-}
+  for (const { width, gap } of GAPS) {
+    await test.step(`${gap}px at ${width}px`, async () => {
+      await page.setViewportSize({ width, height: 900 });
+
+      expect.soft(Math.abs((await eightBallGap(page)) - gap)).toBeLessThanOrEqual(1);
+    });
+  }
+});
 
 const tableLeft = (page: Page) =>
   page.evaluate(() => parseFloat(getComputedStyle(document.querySelector(".table-scene")!).left));
 
 // The title follows the centered page content, so past 1440 the table has to
 // as well or the two drift apart on very wide screens.
-for (const width of [1440, 1920, 2560, 3040]) {
-  test(`table keeps its distance from the hero text at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+test("table keeps its distance from the hero text from 1440px up", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
 
-    const text = await page.locator("[data-hero-text]:visible").boundingBox();
-    expect(Math.abs((await tableLeft(page)) - text!.x - 831.7)).toBeLessThanOrEqual(1);
-  });
-}
-
-for (const widths of [
-  [1260, 1270, 1280, 1290, 1300],
-  [1420, 1430, 1440, 1450, 1460],
-]) {
-  test(`table doesn't jump between ${widths[0]}px and ${widths[4]}px`, async ({ page }) => {
-    const lefts: number[] = [];
-    await page.goto("/");
-    for (const width of widths) {
+  for (const width of [1440, 1920, 2560, 3040]) {
+    await test.step(`at ${width}px`, async () => {
       await page.setViewportSize({ width, height: 900 });
-      lefts.push(await tableLeft(page));
-    }
 
-    // 5px per 10px of width while centered, 10px while pinned
-    lefts.slice(1).forEach((left, i) => {
-      expect(left - lefts[i]).toBeGreaterThanOrEqual(4.5);
-      expect(left - lefts[i]).toBeLessThanOrEqual(10.5);
+      const text = await page.locator("[data-hero-text]:visible").boundingBox();
+      expect.soft(Math.abs((await tableLeft(page)) - text!.x - 831.7)).toBeLessThanOrEqual(1);
     });
-  });
-}
+  }
+});
+
+test("table doesn't jump where the pin starts and stops", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
+
+  for (const widths of [
+    [1260, 1270, 1280, 1290, 1300],
+    [1420, 1430, 1440, 1450, 1460],
+  ]) {
+    await test.step(`between ${widths[0]}px and ${widths[4]}px`, async () => {
+      const lefts: number[] = [];
+      for (const width of widths) {
+        await page.setViewportSize({ width, height: 900 });
+        lefts.push(await tableLeft(page));
+      }
+
+      // 5px per 10px of width while centered, 10px while pinned
+      lefts.slice(1).forEach((left, i) => {
+        expect.soft(left - lefts[i]).toBeGreaterThanOrEqual(4.5);
+        expect.soft(left - lefts[i]).toBeLessThanOrEqual(10.5);
+      });
+    });
+  }
+});
 
 // From 390 to 500 the title sits between the blue ball above it and the white
 // ball below it, as in the mobile frame (Figma 9026:2071), where the blue ball
 // reaches 18px into the title's box but stays above the letters. 512 is past
 // the scaling range, just into the camera tilt (issue #5).
-for (const width of [390, 445, 500, 512]) {
-  test(`title stays between the blue and white balls at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+test("title stays between the blue and white balls on mobile", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await page.goto("/");
 
-    const text = (await page.locator("[data-hero-text]:visible").boundingBox())!;
-    const blue = (await page.locator('[data-ball="blue"]').boundingBox())!;
-    const white = (await page.locator('[data-ball="white"]').boundingBox())!;
-    expect(blue.y + blue.height - text.y).toBeLessThanOrEqual(19);
-    expect(white.y - (text.y + text.height)).toBeGreaterThanOrEqual(8);
-  });
-}
+  for (const width of [390, 445, 500, 512]) {
+    await test.step(`at ${width}px`, async () => {
+      await page.setViewportSize({ width, height: 900 });
+
+      const text = (await page.locator("[data-hero-text]:visible").boundingBox())!;
+      const blue = (await page.locator('[data-ball="blue"]').boundingBox())!;
+      const white = (await page.locator('[data-ball="white"]').boundingBox())!;
+      expect.soft(blue.y + blue.height - text.y).toBeLessThanOrEqual(19);
+      expect.soft(white.y - (text.y + text.height)).toBeGreaterThanOrEqual(8);
+    });
+  }
+});
