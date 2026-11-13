@@ -69,8 +69,6 @@ const TIP_REST = 2.4205;
 const TIP_TOUCH = 0.95;
 const FOLLOW_THROUGH = 0.28;
 const HOVER_NUDGE = 0.18;
-const SQUASH_STRIKE = 1;
-const SQUASH_SMACK = 1.6;
 
 // cos of the tablet camera's elevation, where the perspective sizing is 1
 const COS_TABLET = 0.97347;
@@ -112,8 +110,8 @@ function rayToRadius(from: Point, dir: Point, radius: number): Point {
 const speedBefore = (endSpeed: number, length: number) =>
   Math.sqrt(endSpeed * endSpeed + 2 * FRICTION * length);
 
-type BallVar = "--bx" | "--bz" | "--bs" | "--spin" | "--sq";
-const BALL_VARS: BallVar[] = ["--bx", "--bz", "--bs", "--spin", "--sq"];
+type BallVar = "--bx" | "--bz" | "--bs" | "--spin";
+const BALL_VARS: BallVar[] = ["--bx", "--bz", "--bs", "--spin"];
 const CUE_VARS = ["--ox", "--oz", "--hx", "--hz", "--hs"];
 
 type BallSpec = typeof cueBall;
@@ -335,11 +333,6 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         }
       });
 
-    const squash = (ball: SceneBall, amount: number) =>
-      tween(0, [0, amount, 0], { duration: 0.14, times: [0, 0.5, 1] }, (q) =>
-        setBall(ball, "--sq", q),
-      );
-
     // Where the white ball touches `target` on its way in along `entryDir`. Balls
     // are drawn round on a squashed table, so they touch when they're this far apart
     // on screen: on a flat camera, depth covers little of it.
@@ -401,12 +394,9 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
       let settled: Promise<void> = Promise.resolve();
       const struck = strike(id, () => {
-        squash(white, SQUASH_STRIKE);
         settled = (async () => {
           await roll(white, legs);
           if (id !== shotId) return;
-          squash(white, SQUASH_SMACK);
-          squash(target, SQUASH_SMACK);
           const { x, z } = target.spec;
           const follow = speedBefore(0, distance(contact, target.spec));
           await Promise.all([
