@@ -101,20 +101,48 @@ export default function SiteNav() {
         isHidden ? "-translate-y-full" : ""
       }`}
     >
-      <div className="flex items-center gap-2">
-        <ArrowIcon />
-        <span className="font-display">DESIGN CO</span>
-      </div>
+      <a href="https://designatucsd.com/" target="_blank">
+        <div className="flex items-center gap-2">
+          <ArrowIcon />
+          <span className="font-display">DESIGN CO</span>
+        </div>
+      </a>
       <div className="hidden min-[744px]:flex items-center space-x-8 text-base font-display text-white">
-        <a href="#about" onClick={(event) => scrollToSection(event, "about")} className="hover:text-gray-300 transition-colors">About</a>
-        <a href="#agenda" onClick={(event) => scrollToSection(event, "agenda")} className="hover:text-gray-300 transition-colors">Agenda</a>
-        <a href="#attendees" onClick={(event) => scrollToSection(event, "attendees")} className="hover:text-gray-300 transition-colors">Attendees</a>
-        <a href="#faq" onClick={(event) => scrollToSection(event, "faq")} className="hover:text-gray-300 transition-colors">FAQ</a>
+        <a
+          href="#about"
+          onClick={(event) => scrollToSection(event, "about")}
+          className="hover:text-gray-300 transition-colors"
+        >
+          About
+        </a>
+        <a
+          href="#agenda"
+          onClick={(event) => scrollToSection(event, "agenda")}
+          className="hover:text-gray-300 transition-colors"
+        >
+          Agenda
+        </a>
+        <a
+          href="#attendees"
+          onClick={(event) => scrollToSection(event, "attendees")}
+          className="hover:text-gray-300 transition-colors"
+        >
+          Attendees
+        </a>
+        <a
+          href="#faq"
+          onClick={(event) => scrollToSection(event, "faq")}
+          className="hover:text-gray-300 transition-colors"
+        >
+          FAQ
+        </a>
       </div>
 
       <button
         type="button"
-        aria-label={isMenuOpen ? "Close navigation menu" : "Open navigation menu"}
+        aria-label={
+          isMenuOpen ? "Close navigation menu" : "Open navigation menu"
+        }
         aria-expanded={isMenuOpen}
         aria-controls="mobile-navigation"
         onClick={() => setIsMenuOpen((isOpen) => !isOpen)}
@@ -146,7 +174,10 @@ export default function SiteNav() {
         <a href="#agenda" onClick={(event) => scrollToSection(event, "agenda")}>
           Agenda
         </a>
-        <a href="#attendees" onClick={(event) => scrollToSection(event, "attendees")}>
+        <a
+          href="#attendees"
+          onClick={(event) => scrollToSection(event, "attendees")}
+        >
           Attendees
         </a>
         <a href="#faq" onClick={(event) => scrollToSection(event, "faq")}>
