@@ -15,7 +15,7 @@ export default function Home() {
       <AboutSection />
       <AgendaSection />
       
-      <section className="overflow-x-clip bg-black py-20 text-white">
+      <section id="attendees" className="overflow-x-clip bg-black py-20 text-white">
         <div
           className="mx-auto max-w-7xl"
           style={{
