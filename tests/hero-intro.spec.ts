@@ -147,3 +147,28 @@ test("the table reset flickers like the intro, from dark", async ({ page }) => {
   const samples = await samplesOf(page);
   expectFlicker(samples.slice(samples.findIndex((s) => s.light < 0.1)));
 });
+
+// The dot over the i glows with the title. It starts with a transparent glow
+// rather than no filter, which framer-motion can't animate from: it used to
+// log "Invalid keyframe value for property filter" on every load.
+test("the title dot glows during the intro without keyframe warnings", async ({ page }) => {
+  const warnings: string[] = [];
+  page.on("console", (message) => {
+    if (message.text().includes("Invalid keyframe")) warnings.push(message.text());
+  });
+  await page.goto("/");
+
+  // some drop-shadow color in the dot's filter has a visible alpha
+  await page.waitForFunction(() => {
+    const dot = Array.from(document.querySelectorAll("[data-hero-glow-dot]")).find(
+      (el) => el.getClientRects().length > 0,
+    )!;
+    const alphas = Array.from(
+      getComputedStyle(dot).filter.matchAll(/rgba\([^)]*,\s*([\d.]+)\)/g),
+      (match) => parseFloat(match[1]),
+    );
+    return alphas.some((alpha) => alpha > 0.3);
+  });
+  await page.waitForSelector("[data-hero-ready]");
+  expect(warnings).toEqual([]);
+});

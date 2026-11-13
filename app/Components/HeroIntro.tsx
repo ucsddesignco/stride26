@@ -70,6 +70,7 @@ const titleGlowLayers = (a: number) => [
   `rgba(252,255,242,${0.35 * a}) 0px 0px 32px`,
 ];
 const titleGlow = (a: number) => titleGlowLayers(a).join(", ");
+// The dot's class in Hero starts it at dotGlow(0); keep the two in step.
 const dotGlow = (a: number) =>
   `drop-shadow(0 0 4px rgba(164,205,249,${0.9 * a})) drop-shadow(0 0 12px rgba(164,205,249,${0.5 * a}))`;
 const GLOW_ON = { title: titleGlow(1), dot: dotGlow(1) };
