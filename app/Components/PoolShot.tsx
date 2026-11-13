@@ -67,6 +67,12 @@ const EIGHT_GONE_SPEED = 640; // the eight ball is hit much harder, and is still
 // largest ball's radius (58, top-down) plus the lamp's 12.6 offset from the
 // table's center, so every part of the ball is out of the light by then.
 const OFF_TABLE_PAST = 80;
+// The white ball rolls on until its shadow is off the felt too (see shadowClear):
+// points sampled around the shadow's outline, and how far past the rim they must be.
+const SHADOW_STEPS = 32;
+const SHADOW_MARGIN = 2;
+// the tablet table's squash, which .table-ball-shadow's --unsquash is relative to
+const SQUASH_TABLET = 0.2288;
 
 // The light cone's slant side, lamp to rim (world px).
 const CONE_SIDE = Math.hypot(LAMP_H, TABLE_RADIUS);
@@ -114,12 +120,20 @@ function rayToRadius(from: Point, dir: Point, radius: number): Point {
   return { x: from.x + dir.x * s, z: from.z + dir.z * s };
 }
 
+// How far a point at `from` must go along the unit `dir` to be `radius` or more
+// from the table center for good (0 if it already is).
+const leaveDistance = (from: Point, dir: Point, radius: number) => {
+  const b = from.x * dir.x + from.z * dir.z;
+  const disc = b * b - (from.x * from.x + from.z * from.z - radius * radius);
+  return disc <= 0 ? 0 : Math.max(0, -b + Math.sqrt(disc));
+};
+
 // The speed a ball needs at the start of a leg to reach `endSpeed` at its end.
 const speedBefore = (endSpeed: number, length: number) =>
   Math.sqrt(endSpeed * endSpeed + 2 * FRICTION * length);
 
-type BallVar = "--bx" | "--bz" | "--bs" | "--spin" | "--dsx" | "--dsz";
-const BALL_VARS: BallVar[] = ["--bx", "--bz", "--bs", "--spin", "--dsx", "--dsz"];
+type BallVar = "--bx" | "--bz" | "--bs" | "--spin";
+const BALL_VARS: BallVar[] = ["--bx", "--bz", "--bs", "--spin"];
 const CUE_VARS = ["--ox", "--oz", "--hx", "--hz", "--hs"];
 
 // The white ball's face turns flat on the screen rather than rolling, so it never
@@ -240,13 +254,6 @@ function darkSide(x: number, z: number, radius: number, s: number, c: number): s
   return d > 0 ? ellipse : `M-2,-2H2V2H-2Z${ellipse}`;
 }
 
-// Where the lamp casts a ball's shadow on the felt, from below its center:
-// (P − lamp) · r / (LAMP_H − r) for a ball of radius r on the felt at P.
-const castOffset = (x: number, z: number, radius: number): Point => {
-  const k = radius / (LAMP_H - radius);
-  return { x: (x - LAMP_X) * k, z: z * k };
-};
-
 export default function PoolShot({ children }: { children: ReactNode }) {
   const scope = useRef<HTMLDivElement>(null);
   const reduceMotion = useReducedMotion();
@@ -359,6 +366,42 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         baseRadius(spec) + view.perspective * DEPTH_SLOPE * (z - spec.z),
       );
 
+    // A ball's shadow outline on the felt, as world-px offsets from its center, for
+    // a ball drawn `radius` wide: .table-ball-shadow's transform, in JS.
+    const shadowOutline = ({ shadow }: BallSpec, radius: number): Point[] => {
+      const p = view.perspective;
+      const unsquash = SQUASH_TABLET / view.squash;
+      const [sa, sb, sc, sd] = shadow.m;
+      const ox = 0.25 + (shadow.x - 0.25) * p;
+      const oz = shadow.z * unsquash * p;
+      const a = 1.0308 + (sa - 1.0308) * p;
+      const b = sb * unsquash * p;
+      const c = sc * p;
+      const d = 1 + (sd * unsquash - 1) * p;
+      return Array.from({ length: SHADOW_STEPS }, (_, i) => {
+        const u = Math.cos((2 * Math.PI * i) / SHADOW_STEPS);
+        const v = Math.sin((2 * Math.PI * i) / SHADOW_STEPS);
+        return { x: radius * (ox + a * u + c * v), z: radius * (oz + b * u + d * v) };
+      });
+    };
+
+    // Where a ball rolling from `from` along `dir` is OFF_TABLE_PAST past the rim
+    // and its shadow is all off the felt, so none of it is left clipped at the rim
+    // while the ball waits off the table. The shadow lies mostly behind the ball,
+    // so at the tablet angle it can still be on the felt when the ball is past the rim.
+    // The ball's size depends on its depth, so this is worked out twice.
+    const shadowClear = (from: Point, dir: Point, spec: BallSpec): Point => {
+      let reach = leaveDistance(from, dir, TABLE_RADIUS + OFF_TABLE_PAST);
+      for (let pass = 0; pass < 2; pass++) {
+        const radius = radiusAt(spec, from.z + dir.z * reach);
+        for (const q of shadowOutline(spec, radius)) {
+          const point = { x: from.x + q.x, z: from.z + q.z };
+          reach = Math.max(reach, leaveDistance(point, dir, TABLE_RADIUS + SHADOW_MARGIN));
+        }
+      }
+      return { x: from.x + dir.x * reach, z: from.z + dir.z * reach };
+    };
+
     const setBall = (ball: SceneBall, name: BallVar, v: number) => {
       ball.el.style.setProperty(name, String(v));
       ball.haze.style.setProperty(name, String(v));
@@ -436,11 +479,6 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       setBall(ball, "--bx", x - ball.spec.x);
       setBall(ball, "--bz", z - ball.spec.z);
       setBall(ball, "--bs", radius / baseRadius(ball.spec));
-      // the Figma shadow, swung by however far the lamp's has since the rest spot
-      const cast = castOffset(x, z, radius);
-      const rest = castOffset(ball.spec.x, ball.spec.z, baseRadius(ball.spec));
-      setBall(ball, "--dsx", cast.x - rest.x);
-      setBall(ball, "--dsz", cast.z - rest.z);
       drawLight(ball, radius);
     };
 
@@ -532,8 +570,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     ) => {
       const contact = contactPoint(target, entryDir);
       const offTable = TABLE_RADIUS + OFF_TABLE_PAST;
-      const exit = rayToRadius(white, exitDir, offTable);
-      const entry = rayToRadius(contact, opposite(entryDir), offTable);
+      const exit = shadowClear(white, exitDir, cueBall);
+      const entry = shadowClear(contact, opposite(entryDir), cueBall);
       const targetEnd = rayToRadius(target, entryDir, offTable);
       const contactSpeed = speedBefore(goneSpeed, distance(target, targetEnd));
       const entrySpeed = speedBefore(contactSpeed, distance(entry, contact));

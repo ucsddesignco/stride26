@@ -385,12 +385,13 @@ body {
    Figma: per ball, --sx/--sz and --sa…--sd (see TableScene). Their depth
    terms are scaled by --unsquash so they keep their on-screen size as the
    camera tilts up, instead of ballooning once the felt stops being squashed.
-   While a ball moves, PoolShot adds --dsx/--dsz (world px): how far the
-   lamp's cast shadow has swung since the ball's resting spot. */
+   The offset is scaled by --bs like the shape, so as a ball moves back the
+   shadow shrinks with it and keeps the same gap, moving rigidly with the
+   ball. */
 .table-ball-shadow {
   transform: translate(
-      calc((var(--x) + var(--bx, 0) + var(--dsx, 0) + var(--r) * (0.25 + (var(--sx) - 0.25) * var(--p))) * 1px),
-      calc((var(--z) + var(--bz, 0) + var(--dsz, 0) + var(--r) * var(--sz) * var(--unsquash) * var(--p)) * 1px)
+      calc((var(--x) + var(--bx, 0) + var(--r) * (0.25 + (var(--sx) - 0.25) * var(--p)) * var(--bs, 1)) * 1px),
+      calc((var(--z) + var(--bz, 0) + var(--r) * var(--sz) * var(--unsquash) * var(--p) * var(--bs, 1)) * 1px)
     )
     matrix(
       calc(var(--r) * (1.0308 + (var(--sa) - 1.0308) * var(--p))),
