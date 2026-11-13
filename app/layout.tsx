@@ -27,7 +27,7 @@ const neuePlakRegular = localFont({
 
 
 export const metadata = {
-  title: 'Stride Base Layout',
+  title: 'DCO Stride 2026',
   description: 'Built with Next.js and Tailwind CSS',
 };
 
