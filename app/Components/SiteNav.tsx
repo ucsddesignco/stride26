@@ -17,7 +17,10 @@ function useHiddenOnScrollDown() {
   const [isHidden, setIsHidden] = useState(false);
 
   useEffect(() => {
-    let lastY = window.scrollY;
+    // Measured from the top, with one check on mount: a page that is already
+    // scrolled down (a scroll before hydration, a #section link, a reload)
+    // counts as a downward scroll, which no scroll event would report.
+    let lastY = 0;
     let frame = 0;
 
     const update = () => {
@@ -37,6 +40,7 @@ function useHiddenOnScrollDown() {
     };
 
     window.addEventListener("scroll", handleScroll, { passive: true });
+    handleScroll();
     return () => {
       window.removeEventListener("scroll", handleScroll);
       cancelAnimationFrame(frame);

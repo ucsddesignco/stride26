@@ -11,41 +11,63 @@ const navBox = (page: Page) =>
     return { top, bottom, height };
   });
 
-// mouse wheel, so real scroll events fire; then wait out the 300ms slide
+// mouse wheel, so real scroll events fire; then wait out the 300ms slide.
+// Only for checks that the nav has NOT moved: there is nothing to wait for.
 const wheel = async (page: Page, deltaY: number) => {
   await page.mouse.wheel(0, deltaY);
   await page.waitForTimeout(600);
 };
 
-for (const width of [390, 744, 1280]) {
-  test(`nav is ${NAV_HEIGHT}px tall and overlays the hero at ${width}px`, async ({ page }) => {
-    await page.setViewportSize({ width, height: 900 });
-    await page.goto("/");
+// Wheel, then wait until the nav has finished sliding away or back.
+const wheelUntilNav = async (page: Page, deltaY: number, state: "hidden" | "shown") => {
+  await page.mouse.wheel(0, deltaY);
+  if (state === "hidden") {
+    await expect.poll(async () => (await navBox(page)).bottom).toBeLessThanOrEqual(0);
+  } else {
+    await expect.poll(async () => (await navBox(page)).top).toBe(0);
+  }
+};
 
-    const nav = await navBox(page);
-    expect(nav.top).toBe(0);
-    expect(nav.height).toBe(NAV_HEIGHT);
+test(`nav is ${NAV_HEIGHT}px tall and overlays the hero at every width`, async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/");
 
-    const heroTop = await page.evaluate(
-      () => document.querySelector(".hero-fluid")!.getBoundingClientRect().top,
-    );
-    expect(heroTop).toBe(0);
-  });
-}
+  for (const width of [390, 744, 1280]) {
+    await test.step(`at ${width}px`, async () => {
+      await page.setViewportSize({ width, height: 900 });
+
+      const nav = await navBox(page);
+      expect.soft(nav.top).toBe(0);
+      expect.soft(nav.height).toBe(NAV_HEIGHT);
+
+      const heroTop = await page.evaluate(
+        () => document.querySelector(".hero-fluid")!.getBoundingClientRect().top,
+      );
+      expect.soft(heroTop).toBe(0);
+    });
+  }
+});
 
 test("nav hides on scroll down and returns on scroll up", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 900 });
   await page.goto("/");
   await page.mouse.move(640, 450);
 
-  await wheel(page, 600);
-  expect((await navBox(page)).bottom).toBeLessThanOrEqual(0);
+  await wheelUntilNav(page, 600, "hidden");
+  await wheelUntilNav(page, -100, "shown");
+  await wheelUntilNav(page, 300, "hidden");
+});
 
-  await wheel(page, -100);
-  expect((await navBox(page)).top).toBe(0);
+// No scroll event reports a page that is scrolled down before the nav's
+// listener exists: a scroll before hydration, a #section link, a reload.
+test("nav is hidden when the page starts scrolled down", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto("/#faq");
 
-  await wheel(page, 300);
-  expect((await navBox(page)).bottom).toBeLessThanOrEqual(0);
+  expect(await page.evaluate(() => window.scrollY)).toBeGreaterThan(NAV_HEIGHT);
+  await expect.poll(async () => (await navBox(page)).bottom).toBeLessThanOrEqual(0);
+
+  await wheelUntilNav(page, -100, "shown");
 });
 
 test("nav stays put within its own height of the top", async ({ page }) => {
