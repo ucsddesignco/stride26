@@ -3,8 +3,55 @@
 import ArrowIcon from "./ArrowIcon";
 import { useEffect, useState } from "react";
 
+// Figma's nav bar height (9026:1632). The bar is fixed over the top of the hero.
+const NAV_HEIGHT = 82;
+// Gap left above a section when a nav link scrolls to it
+const SECTION_GAP = 32;
+// Scroll moves smaller than this don't hide or show the bar
+const SCROLL_TOLERANCE = 5;
+
+/** Headroom: true while the bar should be slid out of view. It hides on a
+    downward scroll, comes back on an upward one, and never hides within the
+    first NAV_HEIGHT px of the page. */
+function useHiddenOnScrollDown() {
+  const [isHidden, setIsHidden] = useState(false);
+
+  useEffect(() => {
+    let lastY = window.scrollY;
+    let frame = 0;
+
+    const update = () => {
+      frame = 0;
+      const y = window.scrollY;
+      if (y <= NAV_HEIGHT) {
+        setIsHidden(false);
+      } else if (Math.abs(y - lastY) >= SCROLL_TOLERANCE) {
+        setIsHidden(y > lastY);
+      } else {
+        return;
+      }
+      lastY = y;
+    };
+    const handleScroll = () => {
+      if (!frame) frame = requestAnimationFrame(update);
+    };
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => {
+      window.removeEventListener("scroll", handleScroll);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  return isHidden;
+}
+
 export default function SiteNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  // keyboard focus inside the bar keeps it on screen
+  const [hasKeyboardFocus, setHasKeyboardFocus] = useState(false);
+  const isScrolledAway = useHiddenOnScrollDown();
+  const isHidden = isScrolledAway && !isMenuOpen && !hasKeyboardFocus;
 
   useEffect(() => {
     const handleEscape = (event: KeyboardEvent) => {
@@ -29,13 +76,15 @@ export default function SiteNav() {
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
-    const navigation = document.querySelector("nav");
-    const navigationHeight = navigation?.getBoundingClientRect().height ?? 0;
-    const sectionTop =
-      section.getBoundingClientRect().top + window.scrollY - 32;
+    // Scrolling up brings the bar back, and keyboard focus keeps it there:
+    // in both cases the section has to stop below it.
+    const sectionTop = section.getBoundingClientRect().top;
+    const barStays =
+      sectionTop < 0 || event.currentTarget.matches(":focus-visible");
+    const offset = SECTION_GAP + (barStays ? NAV_HEIGHT : 0);
 
     window.scrollTo({
-      top: Math.max(sectionTop, 0),
+      top: Math.max(sectionTop + window.scrollY - offset, 0),
       behavior: prefersReducedMotion ? "auto" : "smooth",
     });
 
@@ -43,7 +92,15 @@ export default function SiteNav() {
   };
 
   return (
-    <nav className="relative sticky top-0 z-50 flex items-center justify-between border-b border-white/10 bg-black/80 px-8 py-4 backdrop-blur-md">
+    <nav
+      onFocus={(event) => setHasKeyboardFocus(event.target.matches(":focus-visible"))}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget)) setHasKeyboardFocus(false);
+      }}
+      className={`fixed inset-x-0 top-0 z-50 flex h-[82px] items-center justify-between bg-black px-8 transition-transform duration-300 ease-out motion-reduce:transition-none ${
+        isHidden ? "-translate-y-full" : ""
+      }`}
+    >
       <a href="https://designatucsd.com/" target="_blank">
         <div className="flex items-center gap-2">
           <ArrowIcon />

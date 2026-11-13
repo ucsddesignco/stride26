@@ -182,13 +182,24 @@ export default function TableScene() {
           </clipPath>
         </defs>
 
-        {/* spotlight cone: screen-space, lands on the table's left/right edges */}
-        <polygon
-          aria-hidden
-          className="table-cone"
-          points={`-50.5,-615.4 72.5,-615.4 ${TABLE_RADIUS},0 ${-TABLE_RADIUS},0`}
-          fill="#FFDB9F"
-        />
+        {/* spotlight cone: screen-space, lands on the table's left/right edges.
+            The polygon is the tablet cone. The wings are the two halves of the
+            desktop cone (Figma 9026:2309 in world px, split down the table's
+            center line): curved edges that meet at a point above the frame.
+            They are flattened onto the polygon's edges at tablet width and
+            open out toward desktop (see .table-cone-wing in globals.css).
+            One group, so the overlapping shapes share a single opacity. */}
+        <g aria-hidden className="table-cone" fill="#FFDB9F">
+          <polygon points={`-50.5,-615.4 72.5,-615.4 ${TABLE_RADIUS},0 ${-TABLE_RADIUS},0`} />
+          <path
+            className="table-cone-wing table-cone-wing-left"
+            d={`M12.566,-812.555 C12.366,-812.268 -508.479,-64.249 ${-TABLE_RADIUS},0 L11,0 Z`}
+          />
+          <path
+            className="table-cone-wing table-cone-wing-right"
+            d={`M12.566,-812.555 C12.566,-812.555 ${TABLE_RADIUS},-64.261 ${TABLE_RADIUS},0 L11,0 Z`}
+          />
+        </g>
 
         {/* everything lying on the felt, drawn top-down and squashed by the camera */}
         <g aria-hidden className="table-plane">
