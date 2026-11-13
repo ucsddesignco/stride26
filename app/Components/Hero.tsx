@@ -81,6 +81,8 @@ function Stars({ stars }: { stars: Star[] }) {
 // "Stride" with the dot over the i. Sized by font-size (--wordmark-size, blended
 // with width in globals.css); the dot is in em so it follows. The text-shadow is
 // its resting glow at every size; HeroIntro brightens it and settles back to it.
+// The dot starts with HeroIntro's glow-off filter (dotGlow(0)), not none:
+// framer-motion can't build a starting keyframe for nested drop-shadows from none.
 function Wordmark({ className = "" }: { className?: string }) {
   return (
     <h1 data-hero-glow-title className={`hero-wordmark relative whitespace-nowrap font-display leading-[1.4756] text-cream [text-shadow:0_0_15.5px_rgba(255,255,255,0.65)] ${className}`}>
@@ -92,7 +94,7 @@ function Wordmark({ className = "" }: { className?: string }) {
         data-hero-glow-dot
         width={41.6614}
         height={41.6614}
-        className="absolute left-[1.5441em] top-[0.4228em] size-[0.2637em] max-w-none"
+        className="absolute left-[1.5441em] top-[0.4228em] size-[0.2637em] max-w-none [filter:drop-shadow(0_0_4px_rgba(164,205,249,0))_drop-shadow(0_0_12px_rgba(164,205,249,0))]"
       />
     </h1>
   );

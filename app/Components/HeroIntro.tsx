@@ -10,23 +10,25 @@ import {
 
 // Intro timeline for the hero stage, replayed each time it comes back after
 // fully leaving the viewport:
-// the title fades in with a neon glow, the table light flickers on (as the glow
-// fades), then the cue slides in. Targets are marked in Hero and TableScene
+// the title fades in with a neon glow, the table light flickers on as it does,
+// the glow holds and fades, then the cue slides in. Targets are marked in Hero and TableScene
 // with data-hero-text / -glow-title / -glow-dot / -light / -dim / -cue. Once the cue
 // is in, the stage gets data-hero-ready so PoolShot can take the shot.
 
-// Flicker sequence as [duration in ms, light level]. Level 0 is "off".
-// Dark gaps shrink (260 → 160 → 90 → 50) before the light catches for good.
+// Flicker sequence as [duration in ms, light level]. Level 0 is "off", which
+// only the opening hold uses: between flashes the light drops to GAP, not off.
+// The gaps shrink (200 → 160 → 90 → 50) before the light catches for good.
+const GAP = 0.4;
 const FLICKER: [number, number][] = [
   [120, 0],
-  [60, 0.6],
-  [260, 0],
+  [60, 0.8],
+  [200, GAP],
   [50, 0.75],
-  [160, 0],
+  [160, GAP],
   [60, 0.85],
-  [90, 0],
+  [90, GAP],
   [50, 0.7],
-  [50, 0],
+  [50, GAP],
 ];
 
 // Off, the scene shows at OFF_OPACITY and OFF_BRIGHTNESS. Brightness b is a
@@ -52,7 +54,8 @@ const CUE_OFFSCREEN_MARGIN = 40;
 // retrigger it. Ratios are of the hero itself, so this holds at every size.
 const START_AMOUNT = 0.3;
 
-const TITLE_PAUSE = 1; // s between title and flicker
+const FLICKER_START = 0.3; // s into the intro, while the title is still fading in
+const GLOW_HOLD = 1; // s the glow stays full after the title
 export const CUE_PAUSE = 0.5; // s between flicker and cue
 const TEXT_FADE = 0.6;
 const CUE_SLIDE = 1.1;
@@ -67,6 +70,7 @@ const titleGlowLayers = (a: number) => [
   `rgba(252,255,242,${0.35 * a}) 0px 0px 32px`,
 ];
 const titleGlow = (a: number) => titleGlowLayers(a).join(", ");
+// The dot's class in Hero starts it at dotGlow(0); keep the two in step.
 const dotGlow = (a: number) =>
   `drop-shadow(0 0 4px rgba(164,205,249,${0.9 * a})) drop-shadow(0 0 12px rgba(164,205,249,${0.5 * a}))`;
 const GLOW_ON = { title: titleGlow(1), dot: dotGlow(1) };
@@ -103,7 +107,7 @@ function buildKeyframes() {
 }
 
 export const KEYFRAMES = buildKeyframes();
-const GLOW_FADE = KEYFRAMES.duration; // fades out alongside the flicker
+const GLOW_FADE = KEYFRAMES.duration; // as long as the flicker, but starting later (GLOW_HOLD)
 
 export default function HeroIntro({ children }: { children: ReactNode }) {
   const [scope, animate] = useAnimate<HTMLDivElement>();
@@ -186,6 +190,17 @@ export default function HeroIntro({ children }: { children: ReactNode }) {
       track(animate("[data-hero-text]", { opacity: 1 }, { duration: 0.3 }));
     } else {
       (async () => {
+        // The light starts flickering FLICKER_START in, over the title's
+        // fade-in; it is awaited in step 2.
+        const flicker = {
+          delay: FLICKER_START,
+          duration: KEYFRAMES.duration,
+          times: KEYFRAMES.times,
+          ease: "linear",
+        } as const;
+        track(animate("[data-hero-dim]", { opacity: KEYFRAMES.dim }, flicker));
+        const lit = track(animate("[data-hero-light]", { opacity: KEYFRAMES.light }, flicker));
+
         // 1. title fades in, glow ramps up with it
         const titles = shown("[data-hero-glow-title]");
         const dots = shown("[data-hero-glow-dot]");
@@ -195,18 +210,12 @@ export default function HeroIntro({ children }: { children: ReactNode }) {
         await track(animate("[data-hero-text]", { opacity: 1 }, fadeIn));
         if (cancelled) return;
 
-        // 2. pause, then the light flickers on while the glow fades out
-        const fadeOut = { delay: TITLE_PAUSE, duration: GLOW_FADE, ease: "easeInOut" } as const;
+        // 2. the glow holds, then fades; the light is usually on before the
+        // fade starts, and the fade isn't awaited
+        const fadeOut = { delay: GLOW_HOLD, duration: GLOW_FADE, ease: "easeInOut" } as const;
         glowTitleOff(fadeOut, titles);
         if (dots.length) track(animate(dots, { filter: GLOW_OFF.dot }, fadeOut));
-        const flicker = {
-          delay: TITLE_PAUSE,
-          duration: KEYFRAMES.duration,
-          times: KEYFRAMES.times,
-          ease: "linear",
-        } as const;
-        track(animate("[data-hero-dim]", { opacity: KEYFRAMES.dim }, flicker));
-        await track(animate("[data-hero-light]", { opacity: KEYFRAMES.light }, flicker));
+        await lit;
         if (cancelled || !scope.current) return;
 
         // 3. pause, then the cue slides in
