@@ -114,6 +114,20 @@ body {
   font-size: var(--wordmark-size);
 }
 
+/* Mobile space between the wordmark and the event details: 2px → −6px on --t,
+   so it is 8px tighter once the mobile layout is reached (≤500px). A margin,
+   not gap, because gap can't go negative. */
+.hero-subtitle-gap {
+  margin-top: calc(2px - 8px * var(--t));
+}
+
+/* Mobile text block only: 0 → 8px higher on --t (middle at 302, not 310, once
+   the mobile layout is reached), leaving room for "Click me" below it. A
+   margin so the shared .hero-text top, and the tablet block, are untouched. */
+.hero-text-mobile {
+  margin-top: calc(-8px * var(--t));
+}
+
 /* ─── Hero pool table (see app/_components/TableScene.tsx) ───────────────────
    Across --u the table slides from its desktop pose to its tablet pose; across
    --t the camera tilts from the tablet angle to straight top-down. Everything
@@ -210,20 +224,13 @@ body {
   }
 }
 
-/* Desktop yellow star (see desktopStars in Hero.tsx). Up to 1280 it sits in its
-   Figma place, 657 across and 84 down (562 from the stage's right), at the
-   cone's edge. Above that the title holds still while the cone moves away with
-   the table, so a gap opens between "Stride" (ends 570 across) and the cone
-   (1059 across at the star's height at 1680). The star drifts into the middle
-   of that gap and down beside the wordmark's top: by --hero-frame it is 784
-   across (127 further, so 0.6825 = 1 - 127/400 of the widening goes to its
-   right offset) and 150 down (66 lower, 0.165 = 66/400). --widen is how much
-   wider than 1280 the star stage is, so past --hero-frame the star holds its
-   place in the frame. */
+/* Desktop yellow star (see desktopStars in Hero.tsx). At every desktop width it
+   sits in the space between "Stride" (ends 570 across) and the cone, beside
+   the wordmark's top: 712 across and 150 down, held from the stage's left like
+   the title, not in its Figma place at the cone's edge (657, 84 at 1280). */
 .hero-star-gap {
-  --widen: clamp(0px, 100cqw - 1280px, var(--hero-frame) - 1280px);
-  right: calc(562px + 0.6825 * var(--widen));
-  top: calc(84px + 0.165 * var(--widen));
+  left: 712px;
+  top: 150px;
 }
 
 /* Mobile star stage (see Hero.tsx): scales with the mobile frame around the
@@ -286,6 +293,7 @@ body {
 /* Ball radius eases from its tablet size to its top-down size */
 .table-ball,
 .table-ball-shadow,
+.table-hint,
 .table-cue,
 .table-cue-shadow {
   --r: calc(var(--rm) + (var(--rt) - var(--rm)) * var(--p));
@@ -305,6 +313,42 @@ body {
 .table-ball-spin {
   transform: scale(calc(1 - 0.07 * var(--sq, 0)), calc(1 + 0.04 * var(--sq, 0)))
     rotate(calc(var(--spin, 0) * 1deg));
+}
+
+/* "Click me" beside the smiley (see TableScene.tsx, Figma 9346:258). Its origin
+   is the text's top right corner, 0.783 radii left of the ball's resting center
+   and 1.664 above it: the tablet frame's placement, mirrored to the ball's
+   other side, away from the cue. 1 / --k undoes the table's scale, so the
+   text is 16px and the arrow its Figma size at every width.
+   On phones the ball is too near the left edge for the text (63px wide): its
+   left end would be 12px in at 500 and 5px off the screen at 390, linear in
+   --m. Below about 474px the text alone slides right to stay 8px inside
+   (.table-hint-text); the arrow stays, or its tip would be on the ball.
+   It shows once the cue is in (data-hero-ready, see HeroIntro) and fades out
+   for good on the first shot (data-dismissed, see PoolShot). Clicks pass
+   through it to the felt. */
+.table-hint {
+  transform: translate(
+      calc((var(--x) - 0.783 * var(--r)) * 1px),
+      calc((var(--z) * var(--s) - var(--r) * var(--c) - 1.664 * var(--r)) * 1px)
+    )
+    scale(calc(1 / var(--k)));
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+
+.table-hint-text {
+  transform: translateX(max(0px, (12.75 - 59.3 * (var(--m) - 1)) * 1px));
+}
+
+[data-hero-intro]:not([data-hero-ready]) .table-hint {
+  opacity: 0;
+  transition: none;
+}
+
+.table-hint[data-dismissed] {
+  opacity: 0;
+  transition: opacity 0.5s;
 }
 
 /* Ball shadows blend from the desktop frame's hand-placed ellipses (at the

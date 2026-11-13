@@ -195,8 +195,11 @@ test("table doesn't jump where the pin starts and stops", async ({ page }) => {
 
 // From 390 to 500 the title sits between the blue ball above it and the white
 // ball below it, as in the mobile frame (Figma 9026:2071), where the blue ball
-// reaches 18px into the title's box but stays above the letters. 512 is past
-// the scaling range, just into the camera tilt (issue #5).
+// reaches 18px into the title's box but stays above the letters. The text
+// block sits 8px higher and 8px shorter on mobile to make room for "Click me"
+// (DECISIONS.md, 2026-11-13), so the ball now reaches up to 22px into the box;
+// what matters is that it stays above the letters, measured from the text
+// itself. 512 is past the scaling range, just into the camera tilt (issue #5).
 test("title stays between the blue and white balls on mobile", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 900 });
   await page.goto("/");
@@ -208,7 +211,27 @@ test("title stays between the blue and white balls on mobile", async ({ page }) 
       const text = (await page.locator("[data-hero-text]:visible").boundingBox())!;
       const blue = (await page.locator('[data-ball="blue"]').boundingBox())!;
       const white = (await page.locator('[data-ball="white"]').boundingBox())!;
-      expect.soft(blue.y + blue.height - text.y).toBeLessThanOrEqual(19);
+      // The top of the tallest letter: the first line's baseline, found with a
+      // zero-size probe sitting on it, less the ink's height above the
+      // baseline in the title's font. The text's own box starts at the font's
+      // ascent line, well above the capitals, so it isn't used.
+      const lettersTop = await page.evaluate(async () => {
+        await document.fonts.ready;
+        const title = Array.from(document.querySelectorAll<HTMLElement>("[data-hero-glow-title]")).find(
+          (el) => el.getClientRects().length > 0,
+        )!;
+        const probe = document.createElement("span");
+        probe.style.cssText = "display:inline-block;width:0;height:0;vertical-align:baseline";
+        title.insertBefore(probe, title.firstChild);
+        const baseline = probe.getBoundingClientRect().bottom;
+        probe.remove();
+        const style = getComputedStyle(title);
+        const ctx = document.createElement("canvas").getContext("2d")!;
+        ctx.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+        return baseline - ctx.measureText(title.textContent!.trim()).actualBoundingBoxAscent;
+      });
+      expect.soft(blue.y + blue.height - text.y).toBeLessThanOrEqual(23);
+      expect.soft(blue.y + blue.height).toBeLessThanOrEqual(lettersTop);
       expect.soft(white.y - (text.y + text.height)).toBeGreaterThanOrEqual(8);
     });
   }
