@@ -217,7 +217,7 @@ export default function Hero() {
         <div className="absolute left-1/2 top-0 hidden h-full w-[744px] -translate-x-1/2 pointer-events-none sm:block lg:hidden">
           <Stars stars={tabletStars} />
         </div>
-        <div className="absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 pointer-events-none sm:hidden">
+        <div className="hero-stars-mobile absolute left-1/2 top-0 h-full w-[390px] -translate-x-1/2 pointer-events-none sm:hidden">
           <Stars stars={mobileStars} />
         </div>
 

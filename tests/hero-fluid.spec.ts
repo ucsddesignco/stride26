@@ -1,13 +1,17 @@
 import { expect, test, type Page } from "@playwright/test";
 
-// The hero blends between its mobile (390), tablet (744) and desktop (1024+)
-// poses with width (--t / --u in globals.css). These are the poses each width
-// should land on; 560 sits between two frames, so it only passes if the blend
-// is continuous. Safari once computed the viewport width as 0 and stayed in
-// the mobile pose at every width.
+// The hero blends between its tablet (744) and desktop (1024+) poses with width
+// (--u in globals.css), and from tablet to the top-down mobile pose between 744
+// and 500 (--t). From 500 down to the mobile frame (390) nothing blends: the
+// mobile pose just scales with the width (--m). These are the poses each width
+// should land on; 445 and 560 sit between frames, so they only pass if the
+// scaling and the blend are continuous. Safari once computed the viewport
+// width as 0 and stayed in the mobile pose at every width.
 const POSES = [
   { width: 390, scale: 0.5428, squash: 1, sceneTop: 379, textTop: 310 },
-  { width: 560, scale: 0.7624, squash: 0.8, sceneTop: 492.67, textTop: 220.68 },
+  { width: 445, scale: 0.6194, squash: 1, sceneTop: 379, textTop: 310 },
+  { width: 500, scale: 0.6959, squash: 1, sceneTop: 379, textTop: 310 },
+  { width: 560, scale: 0.7707, squash: 0.9462, sceneTop: 437.2, textTop: 264.26 },
   { width: 744, scale: 1, squash: 0.2288, sceneTop: 615.69, textTop: 124 },
   { width: 1280, scale: 1.0363, squash: 0.2288, sceneTop: 625.58, textTop: 115 },
 ];
@@ -96,5 +100,86 @@ for (const { width, wing, coneWidth } of CONES) {
     if (coneWidth !== null) {
       expect(Math.abs((await coneWidthBelowNav(page, width)) - coneWidth)).toBeLessThanOrEqual(3);
     }
+  });
+}
+
+// From 1280 to 1440 the table is pinned to the hero's right edge, so the eight
+// ball keeps the desktop frame's gap (Figma 9026:1631). Below 1280 the table is
+// placed from the center (17.5px at 1024), and from 1440 up it is again, 80px
+// further right, so the gap grows by half of any extra width.
+const eightBallGap = (page: Page) =>
+  page.evaluate(() => {
+    const hero = document.querySelector(".hero-fluid")!.getBoundingClientRect();
+    const ball = document.querySelector('[data-ball="eight"]')!.getBoundingClientRect();
+    return hero.right - ball.right;
+  });
+
+const GAPS = [
+  { width: 1024, gap: 17.5 },
+  { width: 1280, gap: 145.5 },
+  { width: 1360, gap: 145.5 },
+  { width: 1440, gap: 145.5 },
+  { width: 1920, gap: 385.5 },
+  { width: 2560, gap: 705.5 },
+];
+
+for (const { width, gap } of GAPS) {
+  test(`eight ball sits ${gap}px from the right edge at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+
+    expect(Math.abs((await eightBallGap(page)) - gap)).toBeLessThanOrEqual(1);
+  });
+}
+
+const tableLeft = (page: Page) =>
+  page.evaluate(() => parseFloat(getComputedStyle(document.querySelector(".table-scene")!).left));
+
+// The title follows the centered page content, so past 1440 the table has to
+// as well or the two drift apart on very wide screens.
+for (const width of [1440, 1920, 2560, 3040]) {
+  test(`table keeps its distance from the hero text at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+
+    const text = await page.locator("[data-hero-text]:visible").boundingBox();
+    expect(Math.abs((await tableLeft(page)) - text!.x - 831.7)).toBeLessThanOrEqual(1);
+  });
+}
+
+for (const widths of [
+  [1260, 1270, 1280, 1290, 1300],
+  [1420, 1430, 1440, 1450, 1460],
+]) {
+  test(`table doesn't jump between ${widths[0]}px and ${widths[4]}px`, async ({ page }) => {
+    const lefts: number[] = [];
+    await page.goto("/");
+    for (const width of widths) {
+      await page.setViewportSize({ width, height: 900 });
+      lefts.push(await tableLeft(page));
+    }
+
+    // 5px per 10px of width while centered, 10px while pinned
+    lefts.slice(1).forEach((left, i) => {
+      expect(left - lefts[i]).toBeGreaterThanOrEqual(4.5);
+      expect(left - lefts[i]).toBeLessThanOrEqual(10.5);
+    });
+  });
+}
+
+// From 390 to 500 the title sits between the blue ball above it and the white
+// ball below it, as in the mobile frame (Figma 9026:2071), where the blue ball
+// reaches 18px into the title's box but stays above the letters. 512 is past
+// the scaling range, just into the camera tilt (issue #5).
+for (const width of [390, 445, 500, 512]) {
+  test(`title stays between the blue and white balls at ${width}px`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/");
+
+    const text = (await page.locator("[data-hero-text]:visible").boundingBox())!;
+    const blue = (await page.locator('[data-ball="blue"]').boundingBox())!;
+    const white = (await page.locator('[data-ball="white"]').boundingBox())!;
+    expect(blue.y + blue.height - text.y).toBeLessThanOrEqual(19);
+    expect(white.y - (text.y + text.height)).toBeGreaterThanOrEqual(8);
   });
 }
