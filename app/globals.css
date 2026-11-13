@@ -141,6 +141,9 @@ body {
   --p: calc(var(--c) / 0.97347);
   /* undoes the felt's squash relative to the tablet angle (see shadows) */
   --unsquash: calc(0.2288 / var(--s));
+  /* the light cone's haze: fades out toward mobile (see .table-cone and
+     .table-ball-haze, which tints a ball's unlit side in front of it) */
+  --cone-opacity: calc(0.21 * max(0, 1 - 1.5 * var(--t)));
 
   /* table center and scale move from the desktop to the tablet to the mobile
      frame (--t and --u are never both non-zero, so their terms just add).
@@ -253,7 +256,7 @@ body {
 }
 
 .table-cone {
-  opacity: calc(0.21 * max(0, 1 - 1.5 * var(--t)));
+  opacity: var(--cone-opacity);
 }
 
 /* The desktop cone is wider than the tablet one where it meets the nav bar.
@@ -292,6 +295,7 @@ body {
 
 /* Ball radius eases from its tablet size to its top-down size */
 .table-ball,
+.table-ball-haze,
 .table-ball-shadow,
 .table-hint,
 .table-cue,
@@ -303,8 +307,12 @@ body {
    on the felt (world px), --bs scales them and --spin turns the white ball's
    face (deg). The blue and eight balls roll for real instead: --spot moves
    their spot over the sphere (an SVG matrix, none at rest).
-   Balls never change shape: billiard balls are rigid. */
-.table-ball {
+   Balls never change shape: billiard balls are rigid. Their side out of the
+   lamp's light is a path PoolShot redraws as they move (.table-ball-dark),
+   drawn again in the cone's haze by a twin that follows the same variables
+   (.table-ball-haze), clipped to the cone's shape on screen. */
+.table-ball,
+.table-ball-haze {
   transform: translate(
       calc((var(--x) + var(--bx, 0)) * 1px),
       calc(((var(--z) + var(--bz, 0)) * var(--s) - var(--r) * var(--c)) * 1px)
@@ -318,6 +326,16 @@ body {
 
 .table-ball-spot {
   transform: var(--spot, none);
+}
+
+.table-ball-dark {
+  pointer-events: none;
+}
+
+/* the cone's haze over black, as the cone itself is drawn */
+.table-ball-haze {
+  fill-opacity: var(--cone-opacity);
+  pointer-events: none;
 }
 
 /* "Click me" beside the smiley (see TableScene.tsx, Figma 9346:258). Its origin
@@ -366,11 +384,13 @@ body {
    stays within the ball's height.
    Figma: per ball, --sx/--sz and --sa…--sd (see TableScene). Their depth
    terms are scaled by --unsquash so they keep their on-screen size as the
-   camera tilts up, instead of ballooning once the felt stops being squashed. */
+   camera tilts up, instead of ballooning once the felt stops being squashed.
+   While a ball moves, PoolShot adds --dsx/--dsz (world px): how far the
+   lamp's cast shadow has swung since the ball's resting spot. */
 .table-ball-shadow {
   transform: translate(
-      calc((var(--x) + var(--bx, 0) + var(--r) * (0.25 + (var(--sx) - 0.25) * var(--p))) * 1px),
-      calc((var(--z) + var(--bz, 0) + var(--r) * var(--sz) * var(--unsquash) * var(--p)) * 1px)
+      calc((var(--x) + var(--bx, 0) + var(--dsx, 0) + var(--r) * (0.25 + (var(--sx) - 0.25) * var(--p))) * 1px),
+      calc((var(--z) + var(--bz, 0) + var(--dsz, 0) + var(--r) * var(--sz) * var(--unsquash) * var(--p)) * 1px)
     )
     matrix(
       calc(var(--r) * (1.0308 + (var(--sa) - 1.0308) * var(--p))),

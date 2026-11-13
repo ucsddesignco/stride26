@@ -12,6 +12,22 @@ import type { CSSProperties } from "react";
 
 export const TABLE_RADIUS = 508.48;
 
+// The lamp: the apex of the light cone, whose base is the felt. The desktop
+// cone's wings meet at screen (12.566, −812.555) (see the cone below), drawn at
+// the tablet camera angle, where a point (x, 0, h) shows at (x, −h·c) with
+// c = 0.97347. So the lamp hangs over x = 12.566, z = 0 at h = 812.555 / c.
+// A point at height h is lit while it is less than
+// TABLE_RADIUS · (1 − h / LAMP_H) from the lamp horizontally.
+export const LAMP_X = 12.566;
+export const LAMP_H = 812.555 / 0.97347; // ≈ 834.70
+
+// The cone's outline on screen: the tablet polygon, and the desktop wings
+// (see .table-cone-wing in globals.css). Drawn once as the haze and once as
+// a clip that tints a ball's unlit side where it sits in front of the haze.
+const CONE_POLYGON = `-50.5,-615.4 72.5,-615.4 ${TABLE_RADIUS},0 ${-TABLE_RADIUS},0`;
+const CONE_WING_LEFT = `M12.566,-812.555 C12.366,-812.268 -508.479,-64.249 ${-TABLE_RADIUS},0 L11,0 Z`;
+const CONE_WING_RIGHT = `M12.566,-812.555 C12.566,-812.555 ${TABLE_RADIUS},-64.261 ${TABLE_RADIUS},0 L11,0 Z`;
+
 type Ball = {
   kind: "yellow" | "blue" | "white" | "eight";
   x: number;
@@ -147,6 +163,20 @@ function BallArt({ kind }: { kind: Ball["kind"] }) {
   }
 }
 
+// A ball's unlit side on its unit circle, black or in the cone's haze colour
+// (its opacity is the cone's, see .table-ball-haze).
+function BallDark({ haze = false }: { haze?: boolean }) {
+  return (
+    <path
+      data-ball-dark
+      className="table-ball-dark"
+      clipPath="url(#table-ball-dark-clip)"
+      fillRule="evenodd"
+      fill={haze ? "#FFDB9F" : "black"}
+    />
+  );
+}
+
 // Cue artwork on a unit band: x 0 (tip) → 1 (butt), y −0.5 → 0.5.
 // Tip and butt start from the desktop cue (9026:1697); butt segment widths
 // from the mobile cue (9026:2118), the only frame that shows the butt.
@@ -186,6 +216,18 @@ export default function TableScene() {
           <clipPath id="table-ball-clip">
             <circle r="1" />
           </clipPath>
+          {/* a ball's dark side reaches 2% past its outline, over the ball's
+              antialiased edge, which would otherwise show as a faint ring; past
+              the ball it paints the black or haze already there */}
+          <clipPath id="table-ball-dark-clip">
+            <circle r="1.02" />
+          </clipPath>
+          {/* the cone's screen shape, moved by the same CSS as the haze below */}
+          <clipPath id="table-cone-clip">
+            <polygon points={CONE_POLYGON} />
+            <path className="table-cone-wing table-cone-wing-left" d={CONE_WING_LEFT} />
+            <path className="table-cone-wing table-cone-wing-right" d={CONE_WING_RIGHT} />
+          </clipPath>
         </defs>
 
         {/* spotlight cone: screen-space, lands on the table's left/right edges.
@@ -196,15 +238,9 @@ export default function TableScene() {
             open out toward desktop (see .table-cone-wing in globals.css).
             One group, so the overlapping shapes share a single opacity. */}
         <g aria-hidden className="table-cone" fill="#FFDB9F">
-          <polygon points={`-50.5,-615.4 72.5,-615.4 ${TABLE_RADIUS},0 ${-TABLE_RADIUS},0`} />
-          <path
-            className="table-cone-wing table-cone-wing-left"
-            d={`M12.566,-812.555 C12.366,-812.268 -508.479,-64.249 ${-TABLE_RADIUS},0 L11,0 Z`}
-          />
-          <path
-            className="table-cone-wing table-cone-wing-right"
-            d={`M12.566,-812.555 C12.566,-812.555 ${TABLE_RADIUS},-64.261 ${TABLE_RADIUS},0 L11,0 Z`}
-          />
+          <polygon points={CONE_POLYGON} />
+          <path className="table-cone-wing table-cone-wing-left" d={CONE_WING_LEFT} />
+          <path className="table-cone-wing table-cone-wing-right" d={CONE_WING_RIGHT} />
         </g>
 
         {/* everything lying on the felt, drawn top-down and squashed by the camera */}
@@ -253,7 +289,19 @@ export default function TableScene() {
               <g className="table-ball-spin">
                 <BallArt kind={ball.kind} />
               </g>
+              {/* the side out of the lamp's light (PoolShot writes d); empty while lit */}
+              {ball.kind !== "yellow" && <BallDark />}
             </g>
+            {/* the same unlit side again in the cone's haze, shown only where the
+                ball is in front of the cone, so a ball leaving out the back fades
+                into the haze rather than turning into a black disc */}
+            {ball.kind !== "yellow" && (
+              <g aria-hidden clipPath="url(#table-cone-clip)">
+                <g data-ball-haze={ball.kind} className="table-ball-haze" style={ballVars(ball)}>
+                  <BallDark haze />
+                </g>
+              </g>
+            )}
           </g>
         ))}
 

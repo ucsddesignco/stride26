@@ -10,12 +10,20 @@ import {
   type ValueAnimationTransition,
 } from "framer-motion";
 import { CUE_PAUSE, KEYFRAMES } from "./HeroIntro";
-import { DEPTH_SLOPE, TABLE_RADIUS, blueBall, cueBall, eightBall } from "./TableScene";
+import {
+  DEPTH_SLOPE,
+  LAMP_H,
+  LAMP_X,
+  TABLE_RADIUS,
+  blueBall,
+  cueBall,
+  eightBall,
+} from "./TableScene";
 
 // Two shots on a table that carries on past the light. Hovering the cue or the
 // white ball draws the cue back a little. Click the table or the
-// cue: the white ball fades out at the left edge, bounces off a wall
-// nobody can see, fades back in on the top edge and smacks the blue ball, which
+// cue: the white ball rolls out of the lamp's light at the left edge, bounces
+// off a wall nobody can see, rolls back into it at the top edge and smacks the blue ball, which
 // rolls out of the light while the white ball slows and settles on its spot. The
 // cue then comes in from the left, and a second click sends the white ball out
 // the right edge and back in from the front, into the eight ball, which flies off
@@ -55,11 +63,16 @@ const BOUNCE_KEEP = 0.85; // share of its speed a ball keeps off a wall
 const GONE_SPEED = 140; // px/s a struck ball still has as it leaves the light
 const EIGHT_GONE_SPEED = 640; // the eight ball is hit much harder, and is still flying as it leaves
 
-// A ball fades over this much of its path, finishing RIM_PAST beyond the rim.
-// On a short way in, it's solid by ENTRY_FADE_SHARE of the path, so before contact.
-const FADE_BAND = 110;
-const RIM_PAST = 15;
-const ENTRY_FADE_SHARE = 0.75;
+// Balls go dark by leaving the lamp's light (see drawLight), not by fading.
+// They turn, are hidden and reappear this far past the rim: more than the
+// largest ball's radius (58, top-down) plus the lamp's 12.6 offset from the
+// table's center, so every part of the ball is out of the light by then.
+const OFF_TABLE_PAST = 80;
+
+// The light cone's slant side, lamp to rim (world px).
+const CONE_SIDE = Math.hypot(LAMP_H, TABLE_RADIUS);
+// segments in the drawn edge of a ball's light
+const EDGE_STEPS = 20;
 
 // Cue travel along its axis in ball radii (+ draws back toward the butt). It
 // rests TIP_REST radii from the ball's center, aimed 0.32 radii above it, so the
@@ -91,11 +104,7 @@ const speed = () => {
 };
 const pause = (ms: number) => sleep(ms / speed());
 const distance = (a: Point, b: Point) => Math.hypot(b.x - a.x, b.z - a.z);
-const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-const smoothstep = (v: number) => {
-  const t = clamp01(v);
-  return t * t * (3 - 2 * t);
-};
+const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 const opposite = ({ x, z }: Point): Point => ({ x: -x, z: -z });
 
 // Where a ray from `from` along the unit `dir` crosses a circle around the table center.
@@ -110,8 +119,8 @@ function rayToRadius(from: Point, dir: Point, radius: number): Point {
 const speedBefore = (endSpeed: number, length: number) =>
   Math.sqrt(endSpeed * endSpeed + 2 * FRICTION * length);
 
-type BallVar = "--bx" | "--bz" | "--bs" | "--spin";
-const BALL_VARS: BallVar[] = ["--bx", "--bz", "--bs", "--spin"];
+type BallVar = "--bx" | "--bz" | "--bs" | "--spin" | "--dsx" | "--dsz";
+const BALL_VARS: BallVar[] = ["--bx", "--bz", "--bs", "--spin", "--dsx", "--dsz"];
 const CUE_VARS = ["--ox", "--oz", "--hx", "--hz", "--hs"];
 
 // The white ball's face turns flat on the screen rather than rolling, so it never
@@ -147,6 +156,10 @@ type SceneBall = {
   spec: BallSpec;
   el: SVGElement;
   shadow: SVGElement;
+  /** the twin that draws the unlit side in the cone's haze (see TableScene) */
+  haze: SVGElement;
+  /** the unlit side: in the ball, and in its haze twin */
+  dark: SVGPathElement[];
   x: number;
   z: number;
   /** white only: the flat turn of its face (deg) */
@@ -156,7 +169,7 @@ type SceneBall = {
   spot: { el: SVGCircleElement; u: number; v: number } | null;
 };
 
-type Leg = Point & { v0: number; v1: number; fade: "in" | "out" | "dark" | "solid" };
+type Leg = Point & { v0: number; v1: number };
 type Roll = {
   ball: SceneBall;
   legs: Leg[];
@@ -183,18 +196,80 @@ function bankLegs(
   const atExit = speedBefore(atWall, distance(exit, wall));
   const atStart = speedBefore(atExit, distance(start, exit));
   return [
-    { ...exit, v0: atStart, v1: atExit, fade: "out" },
-    { ...wall, v0: atExit, v1: atWall, fade: "dark" },
-    { ...entry, v0: offWall, v1: atEntry, fade: "dark" },
-    { ...contact, v0: atEntry, v1: contactSpeed, fade: "in" },
+    { ...exit, v0: atStart, v1: atExit },
+    { ...wall, v0: atExit, v1: atWall },
+    { ...entry, v0: offWall, v1: atEntry },
+    { ...contact, v0: atEntry, v1: contactSpeed },
   ];
 }
 
-const legOpacity = (fade: Leg["fade"], travelled: number, length: number) => {
-  if (fade === "dark") return 0;
-  if (fade === "solid") return 1;
-  if (fade === "out") return smoothstep((length - travelled) / Math.min(FADE_BAND, length));
-  return smoothstep(travelled / Math.min(FADE_BAND, length * ENTRY_FADE_SHARE));
+// The part of a ball out of the lamp's light, as a path on its unit circle
+// (clipped just past it): "" while it's all lit, null once all you can see is dark.
+// The light is a cone from the lamp down to the felt, and over a ball its side
+// is near enough a plane, so the edge of the light is where that plane cuts the
+// sphere: a circle, which shows as an ellipse, like the moon's terminator.
+// Camera (see TableScene): the screen's x and y and the way toward the viewer
+// are (1, 0, 0), (0, s, −c) and (0, c, s) in world (x, z, h); this holds
+// top-down (c = 0) too. `radius` is the ball's, and its center's height.
+function darkSide(x: number, z: number, radius: number, s: number, c: number): string | null {
+  const dx = x - LAMP_X;
+  const reach = Math.hypot(dx, z);
+  // how far the ball's center is outside the cone's side, in radii (− inside)
+  const out = ((reach - TABLE_RADIUS * (1 - radius / LAMP_H)) * LAMP_H) / CONE_SIDE / radius;
+  if (out <= -1) return "";
+  if (out >= 1) return null;
+  // The side's outward normal n, in screen axes: (a1, a2) on screen, nv toward
+  // the viewer. On the unit sphere a point q is dark when n · q > d.
+  const d = -out;
+  const rx = reach > 1e-6 ? dx / reach : 1;
+  const rz = reach > 1e-6 ? z / reach : 0;
+  const nx = (rx * LAMP_H) / CONE_SIDE;
+  const nz = (rz * LAMP_H) / CONE_SIDE;
+  const nh = TABLE_RADIUS / CONE_SIDE;
+  const a1 = nx;
+  const a2 = nz * s - nh * c;
+  const nv = nz * c + nh * s;
+  const A = Math.hypot(a1, a2);
+  // Work in a frame turned so the dark side is toward +X on screen.
+  const ex = A > 1e-6 ? a1 / A : 1;
+  const ey = A > 1e-6 ? a2 / A : 0;
+  const pt = (X: number, Y: number) =>
+    `${(X * ex - Y * ey).toFixed(4)},${(X * ey + Y * ex).toFixed(4)}`;
+  // The edge circle: center d·n, radius rho. At angle θ it shows at
+  // (A·d − rho·nv·sin θ, rho·cos θ), and faces the viewer by nv·d + rho·A·sin θ.
+  const rho = Math.sqrt(1 - d * d);
+  const edge = (θ: number) => pt(A * d - rho * nv * Math.sin(θ), rho * Math.cos(θ));
+
+  if (A > Math.abs(d)) {
+    // The edge meets the ball's outline: draw its front half, between the two
+    // points where it turns away, then close round the outline's dark side
+    // (from outside the circle; the clip trims it to the outline).
+    const from = Math.asin(clamp((-nv * d) / (rho * A), -1, 1));
+    const reachOutline = Math.acos(clamp(d / A, -1, 1));
+    const points: string[] = [];
+    for (let i = 0; i <= EDGE_STEPS; i++)
+      points.push(edge(from + ((Math.PI - 2 * from) * i) / EDGE_STEPS));
+    for (const k of [-1, -0.5, 0, 0.5, 1]) {
+      const a = reachOutline * k;
+      points.push(pt(2 * Math.cos(a), 2 * Math.sin(a)));
+    }
+    return `M${points.join("L")}Z`;
+  }
+  // The edge doesn't reach the outline: it's a whole ellipse on the front, or
+  // all on the back, and the outline is all lit (d > 0) or all dark (d < 0).
+  const facing = nv * d > 0;
+  if (!facing) return d > 0 ? "" : null;
+  const ring: string[] = [];
+  for (let i = 0; i < 2 * EDGE_STEPS; i++) ring.push(edge((Math.PI * i) / EDGE_STEPS));
+  const ellipse = `M${ring.join("L")}Z`;
+  return d > 0 ? ellipse : `M-2,-2H2V2H-2Z${ellipse}`;
+}
+
+// Where the lamp casts a ball's shadow on the felt, from below its center:
+// (P − lamp) · r / (LAMP_H − r) for a ball of radius r on the felt at P.
+const castOffset = (x: number, z: number, radius: number): Point => {
+  const k = radius / (LAMP_H - radius);
+  return { x: (x - LAMP_X) * k, z: z * k };
 };
 
 export default function PoolShot({ children }: { children: ReactNode }) {
@@ -223,9 +298,21 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       // the spot's resting center in ball radii, read from the art itself
       const spotEl = el?.querySelector<SVGCircleElement>("[data-ball-spot]");
       const spot = spotEl ? { el: spotEl, u: spotEl.cx.baseVal.value, v: spotEl.cy.baseVal.value } : null;
-      return el && shadow
-        ? { spec, el, shadow, x: spec.x, z: spec.z, spin: 0, orient: IDENTITY, spot }
-        : null;
+      const haze = root.querySelector<SVGElement>(`[data-ball-haze="${spec.kind}"]`);
+      const dark = [el, haze].map((g) => g?.querySelector<SVGPathElement>("[data-ball-dark]"));
+      if (!el || !shadow || !haze || !dark[0] || !dark[1]) return null;
+      return {
+        spec,
+        el,
+        shadow,
+        haze,
+        dark: dark as SVGPathElement[],
+        x: spec.x,
+        z: spec.z,
+        spin: 0,
+        orient: IDENTITY,
+        spot,
+      };
     };
     const white = makeBall(cueBall);
     const blue = makeBall(blueBall);
@@ -299,11 +386,27 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     const setBall = (ball: SceneBall, name: BallVar, v: number) => {
       ball.el.style.setProperty(name, String(v));
+      ball.haze.style.setProperty(name, String(v));
       ball.shadow.style.setProperty(name, String(v));
     };
+    // reduced motion only: with full motion, balls go dark by leaving the light
     const setBallOpacity = (ball: SceneBall, v: number) => {
-      ball.el.style.opacity = String(v);
-      ball.shadow.style.opacity = String(v);
+      for (const el of [ball.el, ball.haze, ball.shadow]) el.style.opacity = String(v);
+    };
+
+    // Shades the ball's side out of the light. Once all you can see is dark, the
+    // ball and its haze twin are hidden instead: they'd look the same, but the
+    // ball's edge would show through the dark side's as a faint ring.
+    const drawLight = (ball: SceneBall, radius: number) => {
+      const s = view.squash;
+      const path = darkSide(ball.x, ball.z, radius, s, Math.sqrt(Math.max(0, 1 - s * s)));
+      const visibility = path === null ? "hidden" : "";
+      ball.el.style.visibility = visibility;
+      ball.haze.style.visibility = visibility;
+      const d = path ?? "";
+      ball.dark.forEach((el) => {
+        if (el.getAttribute("d") !== d) el.setAttribute("d", d);
+      });
     };
 
     // Draws a ball's spot where its orientation has rolled it. The spot is a disc
@@ -358,11 +461,16 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       setBall(ball, "--bx", x - ball.spec.x);
       setBall(ball, "--bz", z - ball.spec.z);
       setBall(ball, "--bs", radius / baseRadius(ball.spec));
+      // the Figma shadow, swung by however far the lamp's has since the rest spot
+      const cast = castOffset(x, z, radius);
+      const rest = castOffset(ball.spec.x, ball.spec.z, baseRadius(ball.spec));
+      setBall(ball, "--dsx", cast.x - rest.x);
+      setBall(ball, "--dsz", cast.z - rest.z);
+      drawLight(ball, radius);
     };
 
     const putAway = (ball: SceneBall) => {
-      ball.el.style.visibility = "hidden";
-      ball.shadow.style.visibility = "hidden";
+      for (const el of [ball.el, ball.haze, ball.shadow]) el.style.visibility = "hidden";
     };
 
     const advance = (roll: Roll, dt: number) => {
@@ -379,7 +487,6 @@ export default function PoolShot({ children }: { children: ReactNode }) {
             { x: roll.from.x + (leg.x - roll.from.x) * f, z: roll.from.z + (leg.z - roll.from.z) * f },
             roll.ball,
           );
-          setBallOpacity(roll.ball, legOpacity(leg.fade, s, length));
           return;
         }
         roll.time -= duration;
@@ -387,7 +494,6 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         roll.index += 1;
         if (roll.index === roll.legs.length) {
           placeBall(roll.from, roll.ball);
-          setBallOpacity(roll.ball, legOpacity(leg.fade, length, length));
           rolls.delete(roll);
           roll.done();
           return;
@@ -460,13 +566,14 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       goneSpeed: number,
     ) => {
       const contact = contactPoint(target, entryDir);
-      const targetEnd = rayToRadius(target, entryDir, TABLE_RADIUS + RIM_PAST);
+      const offTable = TABLE_RADIUS + OFF_TABLE_PAST;
+      const targetEnd = rayToRadius(target, entryDir, offTable);
       const contactSpeed = speedBefore(goneSpeed, distance(target, targetEnd));
       const legs = bankLegs(
         { x: white.x, z: white.z },
-        rayToRadius(white, exitDir, TABLE_RADIUS + RIM_PAST),
+        rayToRadius(white, exitDir, offTable),
         wall,
-        rayToRadius(contact, opposite(entryDir), TABLE_RADIUS + RIM_PAST),
+        rayToRadius(contact, opposite(entryDir), offTable),
         contact,
         contactSpeed,
       );
@@ -479,8 +586,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
           const { x, z } = target.spec;
           const follow = speedBefore(0, distance(contact, target.spec));
           await Promise.all([
-            roll(target, [{ ...targetEnd, v0: contactSpeed, v1: goneSpeed, fade: "out" }]),
-            roll(white, [{ x, z, v0: follow, v1: 0, fade: "solid" }]),
+            roll(target, [{ ...targetEnd, v0: contactSpeed, v1: goneSpeed }]),
+            roll(white, [{ x, z, v0: follow, v1: 0 }]),
           ]);
           if (id === shotId) putAway(target);
         })();
@@ -645,7 +752,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         ball.spin = 0;
         ball.orient = IDENTITY;
         ball.spot?.el.style.removeProperty("--spot");
-        for (const el of [ball.el, ball.shadow]) {
+        ball.dark.forEach((el) => el.removeAttribute("d"));
+        for (const el of [ball.el, ball.haze, ball.shadow]) {
           BALL_VARS.forEach((name) => el.style.removeProperty(name));
           el.style.removeProperty("opacity");
           el.style.removeProperty("visibility");
