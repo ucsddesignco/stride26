@@ -1,35 +1,44 @@
-import Image, { type StaticImageData } from "next/image";
-import alanPhoto from "./alanPhoto.png";
-import stellaPhoto from "./stellaPhoto.png";
-import gracePhoto from "./gracePhoto.png";
-import caileyPhoto from "./caileyPhoto.png";
+import Image from "next/image";
 
-const people: { name: string; role: string; image: StaticImageData }[] = [
+const YELLOW = { src: "/hero/star-yellow-1.svg", width: 50.239, height: 49.5335 };
+const BLUE = { src: "/hero/star-blue.svg", width: 75.7703, height: 74.7063 };
+const RED = { src: "/hero/star-red.svg", width: 29.9892, height: 29.5714 };
+
+const people: {
+  name: string;
+  role: string;
+  image: string;
+  star: { src: string; width: number; height: number; className: string };
+}[] = [
   {
     name: "Alan Tran",
-    role: "UX Engineer @ Persona",
-    image: alanPhoto,
+    role: "UX Engineer @ Illumina",
+    image: "/alanPhoto.png",
+    star: { ...YELLOW, className: "left-[67%] top-[71%] size-[68px] rotate-[18deg]" },
   },
   {
-    name: "Stella Seki",
-    role: "Senior Product Designer & Design Lead @ AoPS",
-    image: stellaPhoto,
+    name: "Brendan Jew",
+    role: "Senior Product Designer @ Intuit",
+    image: "/brendanPhoto.png",
+    star: { ...BLUE, className: "left-[-5%] top-[-2%] size-[80px] -rotate-6" },
   },
   {
     name: "Grace Lin",
     role: "Product Designer @ Deloitte",
-    image: gracePhoto,
+    image: "/gracePhoto.png",
+    star: { ...RED, className: "left-[56%] top-[-8%] size-[46px]" },
   },
   {
     name: "Cailey Grembowski",
     role: "UX Researcher & UI Designer @ PINT, Inc.",
-    image: caileyPhoto,
+    image: "/caileyPhoto.png",
+    star: { ...YELLOW, className: "left-[-4%] top-[64%] size-[68px] -rotate-[14deg]" },
   },
 ];
 
 export default function AttendingProfessionals() {
   return (
-    <div className="mt-[52px] flex items-start overflow-x-auto overflow-y-hidden scroll-smooth [scrollbar-width:none] [overflow-anchor:none] [&::-webkit-scrollbar]:hidden">
+    <div className="mt-3 flex items-start overflow-x-auto overflow-y-hidden scroll-smooth pt-10 [scrollbar-width:none] [overflow-anchor:none] [&::-webkit-scrollbar]:hidden">
       <div
         aria-hidden
         className="shrink-0"
@@ -43,13 +52,23 @@ export default function AttendingProfessionals() {
           key={person.name}
           className={`w-[236px] shrink-0 ${index < people.length - 1 ? "mr-8" : ""}`}
         >
-          <div className="relative aspect-square w-full overflow-hidden rounded-full">
+          <div className="relative aspect-square w-full">
+            <div className="absolute inset-0 overflow-hidden rounded-full">
+              <Image
+                src={person.image}
+                alt={person.name}
+                fill
+                className="object-cover"
+                sizes="236px"
+              />
+            </div>
             <Image
-              src={person.image}
-              alt={person.name}
-              fill
-              className="object-cover"
-              sizes="236px"
+              src={person.star.src}
+              alt=""
+              aria-hidden
+              width={person.star.width}
+              height={person.star.height}
+              className={`pointer-events-none absolute z-10 max-w-none ${person.star.className}`}
             />
           </div>
           <p className="mt-4 text-center font-sans text-base leading-tight text-white">
