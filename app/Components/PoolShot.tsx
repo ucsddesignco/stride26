@@ -661,8 +661,22 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     };
 
     const putAway = (ball: SceneBall) => {
+      ball.gone = true;
       for (const el of ballParts(ball)) el.style.visibility = "hidden";
     };
+
+    // The camera changes with the viewport, and a ball's spot, size and unlit
+    // side are drawn for the camera they were placed under. On a resize, take
+    // the new camera and redraw every ball that has moved, at rest or mid-roll.
+    const onResize = () => {
+      view = measure();
+      for (const ball of movingBalls) {
+        const moved = ball.x !== ball.spec.x || ball.z !== ball.spec.z || ball.orient !== IDENTITY;
+        if (moved && !ball.gone) placeBall({ x: ball.x, z: ball.z }, ball);
+      }
+    };
+    const resized = new ResizeObserver(onResize);
+    resized.observe(felt);
 
     const advance = (roll: Roll, dt: number) => {
       roll.time += dt;
@@ -1079,6 +1093,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     return () => {
       offscreen.disconnect();
+      resized.disconnect();
       root.removeEventListener("click", onTableClick);
       stopAll();
       unsubscribe.forEach((u) => u());
