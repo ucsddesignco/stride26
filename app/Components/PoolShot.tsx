@@ -278,10 +278,11 @@ const afterContact = (from: Point, u: Point, n: Point, v: number) => {
 };
 
 // How far a ball's center is outside the light cone's side, in its radii
-// (− inside), `reach` from under the lamp. `radius` is the ball's, and its
-// center's height: the cone is narrower up there.
-const lampOut = (reach: number, radius: number) =>
-  ((reach - TABLE_RADIUS * (1 - radius / LAMP_H)) * LAMP_H) / CONE_SIDE / radius;
+// (− inside), `reach` from under the lamp. `radius` is the ball's drawn radius;
+// `height` is its center's height, where the cone is narrower. The CSS lifts
+// the center by the unscaled --r, not the drawn radius (see .table-ball).
+const lampOut = (reach: number, radius: number, height: number) =>
+  ((reach - TABLE_RADIUS * (1 - height / LAMP_H)) * LAMP_H) / CONE_SIDE / radius;
 
 // all of the ball, once it's all dark (the clip trims it to the outline)
 const ALL_DARK = "M-2,-2H2V2H-2Z";
@@ -555,10 +556,16 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     // and past the back rim the haze twin covers the whole ball (--behind),
     // since it's behind the cone of light.
     // In the table's front half the lamp doesn't apply: the ball stays lit and
-    // the front rim's clip hides it as it goes over (see TableScene).
+    // the front rim's clip hides it as it goes over (see TableScene). The two
+    // blend over a ball's radius in front of z = 0, so a ball crossing there by
+    // a side rim doesn't jump from lit to dark. Behind z = 0 it's the lamp alone:
+    // a band there kept blue lit as it left by the right rim at phone widths,
+    // and the clip's side wiped off the lit part.
     const drawLight = (ball: SceneBall, radius: number) => {
       const reach = Math.hypot(ball.x - LAMP_X, ball.z);
-      const out = ball.z >= 0 ? -Infinity : lampOut(reach, radius);
+      const lamp = lampOut(reach, radius, baseRadius(ball.spec));
+      const front = clamp(ball.z / radius, 0, 1);
+      const out = lamp + (Math.min(lamp, -1) - lamp) * front;
       // world px further from the lamp than where it's all dark
       const past = ((out - 1) * radius * CONE_SIDE) / LAMP_H;
       const visibility = past >= DARK_RAMP ? "hidden" : "";
