@@ -61,13 +61,18 @@ const SECOND_CUT = 6;
 // in are worked backward from GONE_SPEED; its speeds out from its EXIT_SPEED.
 const FRICTION = 180; // px/s²
 const OFF_TABLE_TIME = 0.8; // s the white ball waits off the table on each shot
-const FIRST_EXIT_SPEED = 970; // px/s the white ball still has as it goes off the table
+// px/s the white ball still has as it goes off the table on shots 1 and 2. Tuned by
+// eye (first taken from the old wall bank), not derived from anything.
+const FIRST_EXIT_SPEED = 970;
 const SECOND_EXIT_SPEED = 1138;
 const GONE_SPEED = 140; // px/s a struck ball still has as it leaves the light
 const EIGHT_GONE_SPEED = 640; // the eight ball is hit much harder, and is still flying as it leaves
 // After contact the white ball, rolling with topspin, leaves along the tangent and
 // slides this long while its velocity blends to (5/7)·tangent part + (2/7)·its
 // speed in along its line in (the 30° rule), then rolls on straight to a stop.
+// The slide gives shot 2's curve and shot 1's stop-then-creep. Its length is fixed
+// rather than worked out from sliding friction, and rolling friction is left out
+// during it on purpose: that would move the ball about 1px.
 const SLIDE_TIME = 0.12;
 
 // Balls go dark by leaving the lamp's light (see drawLight), not by fading,
@@ -80,8 +85,13 @@ const SLIDE_TIME = 0.12;
 const OFF_TABLE_PAST = 86;
 // The white ball rolls on until its shadow is off the felt too (see shadowClear):
 // points sampled around the shadow's outline, and how far past the rim they must be.
+// 32 samples miss the true ellipse by at most a·(1 − cos(π/32)) ≈ 0.005 of its
+// semi-axis, well inside the margin.
 const SHADOW_STEPS = 32;
 const SHADOW_MARGIN = 2;
+// the reach is re-worked until it moves less than this (px), at most this many times
+const SHADOW_SETTLE = 0.01;
+const SHADOW_MAX_PASSES = 10;
 // the tablet table's squash, which .table-ball-shadow's --unsquash is relative to
 const SQUASH_TABLET = 0.2288;
 
@@ -258,8 +268,9 @@ const legPath = (from: Point, leg: Leg): Path => {
 
 // The white ball just after contact at `from`, coming in along unit `u` at `v`
 // with the struck ball leaving along unit `n`: it leaves along the tangent at
-// v·sin(cut), slides SLIDE_TIME blending linearly to the rolling velocity Vf,
-// then rolls straight along Vf under FRICTION to a stop.
+// v·sin(cut), slides SLIDE_TIME blending linearly to the rolling velocity Vf
+// (without friction, see SLIDE_TIME), then rolls straight along Vf under FRICTION
+// to a stop.
 const afterContact = (from: Point, u: Point, n: Point, v: number) => {
   const along = u.x * n.x + u.z * n.z; // cos(cut)
   const tx = u.x - along * n.x;
@@ -545,15 +556,21 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     // and its shadow is all off the felt, so none of it is left clipped at the rim
     // while the ball waits off the table. The shadow lies mostly behind the ball,
     // so at the tablet angle it can still be on the felt when the ball is past the rim.
-    // The ball's size depends on its depth, so this is worked out twice.
+    // The shadow's size depends on the ball's depth where it stops, which depends on
+    // the reach, so the reach is re-worked until it settles (SHADOW_SETTLE).
     const shadowClear = (from: Point, dir: Point, spec: BallSpec): Point => {
-      let reach = leaveDistance(from, dir, TABLE_RADIUS + OFF_TABLE_PAST);
-      for (let pass = 0; pass < 2; pass++) {
+      const base = leaveDistance(from, dir, TABLE_RADIUS + OFF_TABLE_PAST);
+      let reach = base;
+      for (let pass = 0; pass < SHADOW_MAX_PASSES; pass++) {
         const radius = radiusAt(spec, from.z + dir.z * reach);
+        let next = base;
         for (const q of shadowOutline(spec, radius)) {
           const point = { x: from.x + q.x, z: from.z + q.z };
-          reach = Math.max(reach, leaveDistance(point, dir, TABLE_RADIUS + SHADOW_MARGIN));
+          next = Math.max(next, leaveDistance(point, dir, TABLE_RADIUS + SHADOW_MARGIN));
         }
+        const settled = Math.abs(next - reach) < SHADOW_SETTLE;
+        reach = next;
+        if (settled) break;
       }
       return { x: from.x + dir.x * reach, z: from.z + dir.z * reach };
     };
