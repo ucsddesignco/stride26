@@ -57,16 +57,25 @@ const SECOND_ENTRY = unit(-0.5, -0.87); // about 120° on the table seen from ab
 const FIRST_CUT = 0;
 const SECOND_CUT = 6;
 
-// One rolling ball's physics, in world px and seconds. The white ball's speeds
-// in are worked backward from GONE_SPEED; its speeds out from its EXIT_SPEED.
+// One rolling ball's physics, in world px and seconds. The white ball's speed in
+// on shot 1 is worked backward from GONE_SPEED; on shot 2 it's SECOND_CONTACT_SPEED.
+// Its speeds out are from its EXIT_SPEED.
 const FRICTION = 180; // px/s²
 const OFF_TABLE_TIME = 0.8; // s the white ball waits off the table on each shot
 // px/s the white ball still has as it goes off the table on shots 1 and 2. Tuned by
 // eye (first taken from the old wall bank), not derived from anything.
 const FIRST_EXIT_SPEED = 970;
-const SECOND_EXIT_SPEED = 1138;
-const GONE_SPEED = 140; // px/s a struck ball still has as it leaves the light
-const EIGHT_GONE_SPEED = 640; // the eight ball is hit much harder, and is still flying as it leaves
+const SECOND_EXIT_SPEED = 1000;
+const GONE_SPEED = 140; // px/s the blue ball still has as it leaves the light
+// px/s the eight still has as it leaves the light: about 640 off the hit, 1.87s to
+// the light's edge. Tuned by eye.
+const EIGHT_GONE_SPEED = 300;
+// px/s the white ball hits the eight at, set by hand instead of worked back from the
+// eight's speed (which would be about 641). Picked so the white ball comes to rest
+// about 150 world px past contact (slide plus roll, see afterContact); the roll
+// grows with its square. Not physical: a head-on hit this hard should send the
+// eight off a little faster.
+const SECOND_CONTACT_SPEED = 730;
 // After contact the white ball, rolling with topspin, leaves along the tangent and
 // slides this long while its velocity blends to (5/7)·tangent part + (2/7)·its
 // speed in along its line in (the 30° rule), then rolls on straight to a stop.
@@ -111,6 +120,10 @@ const DRAWBACK = 0.75;
 const TIP_REST = 2.4205;
 const TIP_TOUCH = 0.95;
 const FOLLOW_THROUGH = 0.28;
+// s the cue's stroke takes from drawn back to its follow-through. Shot 2's is 20%
+// slower, to match its slower SECOND_EXIT_SPEED.
+const STROKE_TIME = 0.12;
+const SECOND_STROKE_TIME = 0.15;
 const HOVER_NUDGE = 0.18;
 
 // cos of the tablet camera's elevation, where the perspective sizing is 1
@@ -734,13 +747,20 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     // A shot's geometry: where the white ball meets `target` coming in along
     // `entryDir`, the struck ball's line out n (entryDir turned by `cut`) and end,
-    // the speeds, and what the white ball does after contact.
-    const planShot = (target: SceneBall, entryDir: Point, cut: number, goneSpeed: number) => {
+    // the speeds, and what the white ball does after contact. The white ball's speed
+    // at contact is worked back from the struck ball's, unless `hitSpeed` sets it.
+    const planShot = (
+      target: SceneBall,
+      entryDir: Point,
+      cut: number,
+      goneSpeed: number,
+      hitSpeed?: number,
+    ) => {
       const n = rotate(entryDir, cut);
       const contact = contactPoint(target, n);
       const targetEnd = rayToRadius(target, n, TABLE_RADIUS + OFF_TABLE_PAST);
       const targetSpeed = speedBefore(goneSpeed, distance(target, targetEnd));
-      const contactSpeed = targetSpeed / Math.cos((cut * Math.PI) / 180);
+      const contactSpeed = hitSpeed ?? targetSpeed / Math.cos((cut * Math.PI) / 180);
       return {
         n,
         contact,
@@ -753,7 +773,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     // Draw back, hold, strike. `onHit` fires the frame the tip reaches the ball,
     // which is drawn smaller farther from the viewer, so the tip travels further.
-    const strike = async (id: number, onHit: () => void) => {
+    const strike = async (id: number, onHit: () => void, strokeTime = STROKE_TIME) => {
       const ballScale = radiusAt(cueBall, white.z) / baseRadius(cueBall);
       const touch = TIP_TOUCH * ballScale - TIP_REST;
 
@@ -767,7 +787,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         hit = true;
         onHit();
       });
-      await run(shot, touch - FOLLOW_THROUGH, { duration: 0.12, ease: [0.55, 0, 1, 0.6] });
+      await run(shot, touch - FOLLOW_THROUGH, { duration: strokeTime, ease: [0.55, 0, 1, 0.6] });
       stopWatch?.();
       stopWatch = null;
       if (id !== shotId) return false;
@@ -777,7 +797,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       return id === shotId;
     };
 
-    // The cue strikes and the white ball rolls off the table at `exitSpeed`, waits
+    // The cue strikes over `strokeTime` and the white ball rolls off the table at `exitSpeed`, waits
     // OFF_TABLE_TIME out of sight, then is moved onto the line in and rolls into `target`.
     // `target` leaves `cut` degrees off that line, out of the light, still at
     // `goneSpeed` as it leaves, and the white ball plays out the cut (see afterContact).
@@ -790,12 +810,15 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       cut: number,
       exitSpeed: number,
       goneSpeed: number,
+      hitSpeed?: number,
+      strokeTime = STROKE_TIME,
     ) => {
       const { contact, targetEnd, targetSpeed, contactSpeed, after } = planShot(
         target,
         entryDir,
         cut,
         goneSpeed,
+        hitSpeed,
       );
       const exit = shadowClear(white, exitDir, cueBall);
       const entry = shadowClear(contact, opposite(entryDir), cueBall);
@@ -827,7 +850,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
           ]);
           if (id === shotId) putAway(target);
         })();
-      });
+      }, strokeTime);
       return { struck, settled: () => settled };
     };
 
@@ -899,6 +922,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         SECOND_CUT,
         SECOND_EXIT_SPEED,
         EIGHT_GONE_SPEED,
+        SECOND_CONTACT_SPEED,
+        SECOND_STROKE_TIME,
       );
       if (!(await struck)) return;
 
@@ -938,7 +963,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       await Promise.all([fadeBall(eight, 1, 0), fadeBall(white, 1, 0), fadeCue(1, 0)]);
       if (id !== shotId) return;
       putAway(eight);
-      placeBall(planShot(eight, SECOND_ENTRY, SECOND_CUT, EIGHT_GONE_SPEED).after.rest, white);
+      placeBall(planShot(eight, SECOND_ENTRY, SECOND_CUT, EIGHT_GONE_SPEED, SECOND_CONTACT_SPEED).after.rest, white);
       setBallOpacity(white, 0);
       await fadeBall(white, 0, 1);
       if (id === shotId) stage = "done";
