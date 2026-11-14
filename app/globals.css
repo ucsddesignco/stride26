@@ -307,8 +307,8 @@ body {
 
 /* PoolShot moves the balls (and their shadows) from JS: --bx/--bz offset them
    on the felt (world px), --bs scales them and --spin turns the white ball's
-   face (deg). The blue and eight balls roll for real instead: --spot moves
-   their spot over the sphere (an SVG matrix, none at rest).
+   face (deg). The blue and eight balls roll for real instead: PoolShot
+   redraws their spot's outline on the sphere (see BallSpot).
    Balls never change shape: billiard balls are rigid. Their side out of the
    lamp's light is a path PoolShot redraws as they move (.table-ball-dark),
    drawn again in the cone's haze by a twin that follows the same variables
@@ -325,10 +325,6 @@ body {
 
 .table-ball-spin {
   transform: rotate(calc(var(--spin, 0) * 1deg));
-}
-
-.table-ball-spot {
-  transform: var(--spot, none);
 }
 
 .table-ball-dark {

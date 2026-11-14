@@ -114,6 +114,22 @@ export const DEPTH_SLOPE = 0.0176;
 
 const cueVars = { ...ballVars(cueBall), "--depth-slope": DEPTH_SLOPE } as CSSProperties;
 
+// A ball's off-white spot. At rest it's the art's circle, written as a path:
+// as the ball rolls, PoolShot rewrites d with the spot's true outline on the
+// sphere, reading where it rests from the data attributes.
+function BallSpot({ cx, cy, r }: { cx: number; cy: number; r: number }) {
+  return (
+    <path
+      data-ball-spot
+      data-u={cx}
+      data-v={cy}
+      data-r={r}
+      d={`M${cx - r},${cy}A${r},${r} 0 1 0 ${cx + r},${cy}A${r},${r} 0 1 0 ${cx - r},${cy}Z`}
+      fill="#FCFFF2"
+    />
+  );
+}
+
 // Ball artwork, drawn on a unit circle (scaled to the ball radius in CSS).
 function BallArt({ kind }: { kind: Ball["kind"] }) {
   switch (kind) {
@@ -133,9 +149,8 @@ function BallArt({ kind }: { kind: Ball["kind"] }) {
       return (
         <>
           <circle r="1" fill="#A4CDF9" />
-          {/* the spot rolls with the ball (PoolShot writes --spot) */}
           <g clipPath="url(#table-ball-clip)">
-            <circle data-ball-spot className="table-ball-spot" cx="-0.280" cy="-0.095" r="0.4953" fill="#FCFFF2" />
+            <BallSpot cx={-0.28} cy={-0.095} r={0.4953} />
           </g>
         </>
       );
@@ -160,7 +175,7 @@ function BallArt({ kind }: { kind: Ball["kind"] }) {
         <>
           <circle r="1" fill="black" />
           <g clipPath="url(#table-ball-clip)">
-            <circle data-ball-spot className="table-ball-spot" cx="0.238" cy="-0.210" r="0.4952" fill="#FCFFF2" />
+            <BallSpot cx={0.238} cy={-0.21} r={0.4952} />
           </g>
         </>
       );
@@ -302,9 +317,15 @@ export default function TableScene() {
                 className={`table-ball ${ball === cueBall ? "cursor-pointer" : ""}`}
                 style={ballVars(ball)}
               >
-                <g className="table-ball-spin">
+                {/* only the white ball's face turns flat (--spin); the blue and
+                    eight roll their spot instead, and yellow never moves */}
+                {ball === cueBall ? (
+                  <g className="table-ball-spin">
+                    <BallArt kind={ball.kind} />
+                  </g>
+                ) : (
                   <BallArt kind={ball.kind} />
-                </g>
+                )}
                 {/* the side out of the lamp's light (PoolShot writes d); empty
                     while lit. Black, so off the felt it's lost in the page. */}
                 {ball.kind !== "yellow" && <BallDark />}

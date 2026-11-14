@@ -87,8 +87,6 @@ const SQUASH_TABLET = 0.2288;
 
 // The light cone's slant side, lamp to rim (world px).
 const CONE_SIDE = Math.hypot(LAMP_H, TABLE_RADIUS);
-// segments in the drawn edge of a ball's light
-const EDGE_STEPS = 20;
 // A ball's unlit side over the felt is its own colour times this, not black: a
 // black ball over the lit felt read as a hole. Off the felt it's black, lost in
 // the page. Once all of it is dark, the dim side dims to black over DARK_RAMP
@@ -212,7 +210,9 @@ type SceneBall = {
   spinRate: number;
   /** blue and eight: the ball's 3D orientation, and its off-white spot */
   orient: Mat3;
-  spot: { el: SVGCircleElement; u: number; v: number } | null;
+  spot: { el: SVGPathElement; u: number; v: number; r: number; rest: string } | null;
+  /** put away off the table until the next reset (see putAway) */
+  gone: boolean;
 };
 
 // One straight roll to (x, z), from v0 to v1 px/s.
@@ -305,19 +305,69 @@ function darkSide(x: number, z: number, out: number, s: number): string {
   const ey = length > 1e-6 ? vy / length : 0;
   const pt = (X: number, Y: number) =>
     `${(X * ex - Y * ey).toFixed(4)},${(X * ey + Y * ex).toFixed(4)}`;
-  // The edge from the outline's bottom to its top, (d·sin θ, cos θ); then
+  // The edge is the half-ellipse (d·sin θ, cos θ), θ 0 → π, from the outline's
+  // bottom to its top: an SVG arc with radii |d| and 1, turned with the frame.
+  // It bulges toward +X (SVG's negative sweep) when d > 0. It's drawn as two
+  // quarter arcs through (d, 0): SVG works out an arc's center from its ends,
+  // and for a half-ellipse rounding the ends moves that center visibly. Then
   // close round the outline's dark side from outside the circle.
   const d = -out;
-  const points: string[] = [];
-  for (let i = 0; i <= EDGE_STEPS; i++) {
-    const θ = (Math.PI * i) / EDGE_STEPS;
-    points.push(pt(d * Math.sin(θ), Math.cos(θ)));
-  }
-  for (const k of [-0.5, -0.25, 0, 0.25, 0.5]) {
-    const a = Math.PI * k;
-    points.push(pt(2 * Math.cos(a), 2 * Math.sin(a)));
-  }
-  return `M${points.join("L")}Z`;
+  const turn = ((Math.atan2(ey, ex) * 180) / Math.PI).toFixed(4);
+  const quarter = (X: number, Y: number) =>
+    `A${Math.abs(d).toFixed(4)},1 ${turn} 0 ${d > 0 ? 0 : 1} ${pt(X, Y)}`;
+  const edge = `M${pt(0, 1)}${quarter(d, 0)}${quarter(0, -1)}`;
+  const outside = [-0.5, -0.25, 0, 0.25, 0.5].map((k) =>
+    pt(2 * Math.cos(Math.PI * k), 2 * Math.sin(Math.PI * k)),
+  );
+  return `${edge}L${outside.join("L")}Z`;
+}
+
+// The outline of a circle of angular radius α on a unit sphere, as seen, around
+// the unit direction that shows at (a, b) and faces the camera by f. Seen
+// head-on a circle on the sphere is an ellipse: centered at cos α·(a, b), sin α
+// across (a, b) on screen and sin α·|f| along it. Where it wraps round the
+// back, only its arc in front shows, closed along the ball's edge, where that
+// arc's ends lie. "" when it's all round the back.
+function spotOutline(a: number, b: number, f: number, sinA: number, cosA: number): string {
+  const L = Math.hypot(a, b);
+  // m along (a, b) on screen, e across it
+  const mx = L > 1e-9 ? a / L : 0;
+  const my = L > 1e-9 ? b / L : 1;
+  const ex = -my;
+  const ey = mx;
+  // The circle is cos α·p + sin α·(cos θ·e + sin θ·(p × e)): on screen p × e
+  // is −f·m, and it faces the camera by L, so a point's facing is
+  // f·cos α + L·sin α·sin θ.
+  const at = (θ: number) => [
+    cosA * a + sinA * (Math.cos(θ) * ex - f * Math.sin(θ) * mx),
+    cosA * b + sinA * (Math.cos(θ) * ey - f * Math.sin(θ) * my),
+  ];
+  const n = (v: number) => v.toFixed(4);
+  const pt = ([x, y]: number[]) => `${n(x)},${n(y)}`;
+  const rot = n((Math.atan2(ey, ex) * 180) / Math.PI);
+  // θ increasing turns e toward −f·m: SVG's positive sweep when f > 0
+  const sweep = f > 0 ? 1 : 0;
+  // The arc from θ0 to θ1 in quarters: SVG works out an arc's center from its
+  // ends, and near a half-ellipse rounding the ends moves that center visibly.
+  const arcs = (θ0: number, θ1: number) => {
+    let path = "";
+    for (let i = 1; i <= 4; i++) {
+      const to = at(θ0 + ((θ1 - θ0) * i) / 4);
+      path += `A${n(sinA)},${n(sinA * Math.abs(f))} ${rot} 0 ${sweep} ${pt(to)}`;
+    }
+    return path;
+  };
+
+  // all in front: the whole ellipse
+  if (f * cosA >= L * sinA) return `M${pt(at(0))}${arcs(0, 2 * Math.PI)}Z`;
+  if (f * cosA <= -L * sinA) return "";
+  // in front for sin θ ≥ t0, from θ1 to π − θ1; both ends are on the edge
+  const θ1 = Math.asin((-f * cosA) / (L * sinA));
+  const start = at(θ1);
+  const end = at(Math.PI - θ1);
+  // back along the edge the short way, which passes the spot's side
+  const edgeSweep = end[0] * start[1] - end[1] * start[0] > 0 ? 1 : 0;
+  return `M${pt(start)}${arcs(θ1, Math.PI - θ1)}A1,1 0 0 ${edgeSweep} ${pt(start)}Z`;
 }
 
 // "#RRGGBB" or "black" as RGB 0–255
@@ -348,8 +398,16 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       const el = root.querySelector<SVGElement>(`[data-ball="${spec.kind}"]`);
       const shadow = root.querySelector<SVGElement>(`[data-ball-shadow="${spec.kind}"]`);
       // the spot's resting center in ball radii, read from the art itself
-      const spotEl = el?.querySelector<SVGCircleElement>("[data-ball-spot]");
-      const spot = spotEl ? { el: spotEl, u: spotEl.cx.baseVal.value, v: spotEl.cy.baseVal.value } : null;
+      const spotEl = el?.querySelector<SVGPathElement>("[data-ball-spot]");
+      const spot = spotEl
+        ? {
+            el: spotEl,
+            u: Number(spotEl.dataset.u),
+            v: Number(spotEl.dataset.v),
+            r: Number(spotEl.dataset.r),
+            rest: spotEl.getAttribute("d") ?? "",
+          }
+        : null;
       const haze = root.querySelector<SVGElement>(`[data-ball-haze="${spec.kind}"]`);
       const feltTwin = root.querySelector<SVGElement>(`[data-ball-felt="${spec.kind}"]`);
       const dark = [el, feltTwin, haze].map((g) =>
@@ -363,7 +421,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         haze,
         feltTwin,
         dark: dark as SVGPathElement[],
-        base: parseColour(el.querySelector(".table-ball-spin > circle")?.getAttribute("fill") ?? null),
+        // every ball's art starts with its base circle
+        base: parseColour(el.querySelector("circle")?.getAttribute("fill") ?? null),
         fill: "",
         x: spec.x,
         z: spec.z,
@@ -371,6 +430,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         spinRate: SPIN_SCALE,
         orient: IDENTITY,
         spot,
+        gone: false,
       };
     };
     const white = makeBall(cueBall);
@@ -521,36 +581,27 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       ball.haze.style.setProperty("--behind", String(behind));
     };
 
-    // Draws a ball's spot where its orientation has rolled it. The spot is a disc
-    // on the sphere around the point that, at rest, projects to its art center.
-    // On a unit sphere, (x, z, h) shows at (x, z·s − h·c) and faces the camera by
-    // z·c + h·s. The disc is drawn as the art's circle moved to the new center and
-    // squeezed toward the ball's center by how much it faces the camera compared
-    // with at rest, so an unrolled ball is drawn exactly as the art.
+    // Draws a ball's spot where its orientation has rolled it: a circle on the
+    // sphere of angular radius α (sin α = the art's radius), around the direction
+    // that at rest puts its outline's center on the art's. On a unit sphere,
+    // (x, z, h) shows at (x, z·s − h·c) and faces the camera by z·c + h·s.
     const drawSpot = (ball: SceneBall) => {
       if (!ball.spot) return;
-      const { el, u: u0, v: v0 } = ball.spot;
+      const { el, u: u0, v: v0, r } = ball.spot;
       const s = view.squash;
       const c = Math.sqrt(Math.max(0, 1 - s * s));
-      const w0 = Math.sqrt(Math.max(0, 1 - u0 * u0 - v0 * v0));
-      const p0 = [u0, v0 * s + w0 * c, -v0 * c + w0 * s];
+      const sinA = r;
+      const cosA = Math.sqrt(1 - r * r);
+      const a0 = u0 / cosA;
+      const b0 = v0 / cosA;
+      const f0 = Math.sqrt(Math.max(0, 1 - a0 * a0 - b0 * b0));
+      const p0 = [a0, b0 * s + f0 * c, -b0 * c + f0 * s];
       const m = ball.orient;
       const [px, pz, ph] = [0, 1, 2].map(
-        (r) => m[r * 3] * p0[0] + m[r * 3 + 1] * p0[1] + m[r * 3 + 2] * p0[2],
+        (row) => m[row * 3] * p0[0] + m[row * 3 + 1] * p0[1] + m[row * 3 + 2] * p0[2],
       );
-      const u = px;
-      const v = pz * s - ph * c;
-      const k = Math.max(0, (pz * c + ph * s) / w0); // 0 once it faces away
-      const len = Math.hypot(u, v);
-      const nx = len > 1e-6 ? u / len : 1;
-      const ny = len > 1e-6 ? v / len : 0;
-      const a = 1 + (k - 1) * nx * nx;
-      const b = (k - 1) * nx * ny;
-      const d = 1 + (k - 1) * ny * ny;
-      el.style.setProperty(
-        "--spot",
-        `matrix(${a}, ${b}, ${b}, ${d}, ${u - a * u0 - b * v0}, ${v - b * u0 - d * v0})`,
-      );
+      const d = spotOutline(px, pz * s - ph * c, pz * c + ph * s, sinA, cosA);
+      if (el.getAttribute("d") !== d) el.setAttribute("d", d);
     };
 
     const placeBall = ({ x, z }: Point, ball: SceneBall) => {
@@ -882,7 +933,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         ball.spin = 0;
         ball.spinRate = SPIN_SCALE;
         ball.orient = IDENTITY;
-        ball.spot?.el.style.removeProperty("--spot");
+        ball.gone = false;
+        if (ball.spot) ball.spot.el.setAttribute("d", ball.spot.rest);
         ball.dark.forEach((el) => el.removeAttribute("d"));
         ball.dark[1].style.removeProperty("fill");
         ball.fill = "";
