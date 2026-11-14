@@ -16,6 +16,7 @@ export default function AgendaSection() {
             <div className="m-0 px-6 py-[40px] font-sans border-bottom border-b border-white/30 flex flex-col min-[744px]:max-[1279px]:flex-row min-[744px]:max-[1279px]:items-center"><p className="text-sm min-[744px]:max-[1279px]:w-2/5">8:50 PM PT</p><p className="text-2xl min-[744px]:max-[1279px]:flex-1 min-[744px]:max-[1279px]:text-right">Closing Remarks</p></div>
           </div>
           <div className="relative hidden min-[1280px]:block w-full min-h-0 overflow-hidden">
+            {/* <AgendaGraphic /> */}
             <img src="/agenda-graphic.png" alt="Agenda event illustration" className="absolute inset-x-0 top-0 block w-full max-w-none h-auto" />
           </div>
         </div>
