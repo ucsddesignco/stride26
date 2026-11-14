@@ -175,6 +175,22 @@ const mul3 = (a: Mat3, b: Mat3): Mat3 => {
       out[r * 3 + c] = a[r * 3] * b[c] + a[r * 3 + 1] * b[3 + c] + a[r * 3 + 2] * b[6 + c];
   return out;
 };
+// `m` snapped back to a pure rotation (Gram–Schmidt on its rows), so the float
+// error from multiplying a step in every frame can't build up into a skew.
+const orthonormalize = (m: Mat3): Mat3 => {
+  const r0 = m.slice(0, 3);
+  const r1 = m.slice(3, 6);
+  const norm = (v: number[]) => {
+    const l = Math.hypot(v[0], v[1], v[2]);
+    return v.map((x) => x / l);
+  };
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const a = norm(r0);
+  const d = dot(a, r1);
+  const b = norm(r1.map((x, i) => x - d * a[i]));
+  const c = [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  return [...a, ...b, ...c];
+};
 // Rotation by `angle` around the unit axis (kx, kz, kh) (Rodrigues).
 const axisAngle = (kx: number, kz: number, kh: number, angle: number): Mat3 => {
   const cos = Math.cos(angle);
@@ -622,7 +638,9 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         // rolling without slipping: turn by rolled / radius around the table-plane
         // axis at right angles to the step, so the top moves the way the ball does
         if (rolled > 0)
-          ball.orient = mul3(axisAngle(-dz / rolled, dx / rolled, 0, rolled / radius), ball.orient);
+          ball.orient = orthonormalize(
+            mul3(axisAngle(-dz / rolled, dx / rolled, 0, rolled / radius), ball.orient),
+          );
         drawSpot(ball);
       } else {
         ball.spin += (Math.sign(dx) || 1) * (rolled / radius) * (180 / Math.PI) * ball.spinRate;
