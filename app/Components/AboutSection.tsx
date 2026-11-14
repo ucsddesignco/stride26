@@ -1,17 +1,43 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 import Calendar from "./Calendar";
 
-const placeholderColors = ["#262626", "#404040", "#666666", "#8a8a8a"];
+const introImages = [
+  {
+    src: "/intro/intro-1.webp",
+    alt: "STRIDE Design Expo installation",
+  },
+  {
+    src: "/intro/intro-2.webp",
+    alt: "Visitors exploring STRIDE Design Expo",
+  },
+  {
+    src: "/intro/intro-3.webp",
+    alt: "Design work at STRIDE Design Expo",
+  },
+  {
+    src: "/intro/intro-4.webp",
+    alt: "STRIDE Design Expo showcase",
+  },
+  {
+    src: "/intro/intro-5.webp",
+    alt: "Visitors at STRIDE Design Expo",
+  },
+  {
+    src: "/intro/intro-6.webp",
+    alt: "STRIDE Design Expo event space",
+  },
+];
 
 export default function AboutSection() {
   const [activeSlide, setActiveSlide] = useState(0);
 
   useEffect(() => {
     const interval = window.setInterval(() => {
-      setActiveSlide((currentSlide) => (currentSlide + 1) % placeholderColors.length);
+      setActiveSlide((currentSlide) => (currentSlide + 1) % introImages.length);
     }, 4500);
 
     return () => window.clearInterval(interval);
@@ -33,24 +59,32 @@ export default function AboutSection() {
       <div className="grid grid-cols-1 min-[1280px]:grid-cols-2 gap-8 min-[744px]:gap-12 items-center">
         <div>
           <div className="relative w-full h-[220px] min-[744px]:h-[280px] min-[1280px]:h-[320px] overflow-hidden">
-            <AnimatePresence mode="wait">
+            <AnimatePresence mode="sync">
               <motion.div
                 key={activeSlide}
                 className="absolute inset-0"
-                style={{ backgroundColor: placeholderColors[activeSlide] }}
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
                 transition={{ duration: 0.45, ease: "easeInOut" }}
-              />
+              >
+                <Image
+                  src={introImages[activeSlide].src}
+                  alt={introImages[activeSlide].alt}
+                  fill
+                  sizes="(min-width: 1280px) 50vw, 100vw"
+                  className="object-cover"
+                  priority={activeSlide === 0}
+                />
+              </motion.div>
             </AnimatePresence>
           </div>
           <div className="pt-4 flex w-full justify-center gap-[8px]">
-            {placeholderColors.map((_, index) => (
+            {introImages.map((image, index) => (
               <button
                 key={index}
                 type="button"
-                aria-label={`Show intro image ${index + 1}`}
+                aria-label={`Show ${image.alt}`}
                 aria-pressed={activeSlide === index}
                 onClick={() => setActiveSlide(index)}
                 className={`h-[8px] w-[8px] cursor-pointer rounded-full transition-colors duration-300 ${

@@ -17,7 +17,7 @@ export default function FooterSection() {
           />
         </picture>
         <h1 className="relative z-10 text-4xl min-[744px]:text-5xl font-display">
-          Register for Stride!
+          See you at Stride!
         </h1>
       </div>
       <div className="px-10 min-[744px]:px-20 min-[1280px]:px-30 py-8 font-sans flex flex-wrap gap-4 justify-between text-sm">

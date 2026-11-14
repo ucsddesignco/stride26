@@ -2,6 +2,28 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import Image from "next/image";
+
+// FAQ star layout. Each star has a position and scale for the three art-directed
+// breakpoints: mobile (<744px), tablet (744px–1279px), and desktop (1280px+).
+// Tune the left/top/size values here without needing to change the FAQ markup.
+const faqStars = [
+  {
+    src: "/hero/star-red.svg",
+    className:
+      "left-[5%] top-[192px] size-[30px] min-[744px]:right-[106.5%] min-[744px]:top-[192px] min-[744px]:size-[33px] min-[1280px]:left-[8%] min-[1280px]:top-[192px] min-[1280px]:size-[32px]",
+  },
+  {
+    src: "/hero/star-blue.svg",
+    className:
+      "right-[13%] top-[30px] size-[58px] min-[744px]:left-[38%] min-[744px]:top-[24px] min-[744px]:size-[64px] min-[1280px]:right-[10%] min-[1280px]:top-[20px] min-[1280px]:size-[64px]",
+  },
+  {
+    src: "/hero/star-yellow-1.svg",
+    className:
+      "right-[4%] top-[245px] size-[42px] min-[744px]:right-[5%] min-[744px]:top-[220px] min-[744px]:size-[50px] min-[1280px]:right-[7%] min-[1280px]:top-[205px] min-[1280px]:size-[54px]",
+  },
+] as const;
 
 const faqData = [
   {
@@ -32,14 +54,22 @@ export default function FAQ() {
   };
 
   return (
-    <section id="faq" className="w-full pb-30">
+    <section id="faq" className="relative w-full overflow-clip pb-30">
       {/* Centered container with max-width and your 120px (px-30) padding */}
-      <div className="max-w-7xl mx-auto px-10 min-[744px]:px-20 min-[1280px]:px-30">
-        <h2 className="text-3xl font-display text-white pb-6">
+      <div className="relative mx-auto max-w-7xl px-10 min-[744px]:px-20 min-[1280px]:px-30">
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-[320px]" aria-hidden="true">
+          {faqStars.map((star) => (
+            <div key={star.src} className={`absolute ${star.className}`}>
+              <Image src={star.src} alt="" fill className="object-contain" />
+            </div>
+          ))}
+        </div>
+
+        <h2 className="relative z-10 pb-6 text-3xl font-display text-white">
           FAQ
         </h2>
 
-        <div>
+        <div className="relative z-10">
           {faqData.map((item) => {
             const isOpen = openId === item.id;
             return (
