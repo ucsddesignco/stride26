@@ -1,6 +1,6 @@
 "use client";
 
-import ArrowIcon from "./ArrowIcon";
+import Image from "next/image";
 import { useEffect, useState } from "react";
 
 // Figma's nav bar height (9026:1632). The bar is fixed over the top of the hero.
@@ -105,11 +105,21 @@ export default function SiteNav() {
         isHidden ? "-translate-y-full" : ""
       }`}
     >
-      <a href="https://designatucsd.com/" target="_blank">
-        <div className="flex items-center gap-2">
-          <ArrowIcon />
-          <span className="font-display">DESIGN CO</span>
-        </div>
+      <a
+        href="https://designatucsd.com/"
+        target="_blank"
+        rel="noopener noreferrer"
+        aria-label="Design Co website"
+        className="flex h-16 w-16 items-center p-[14px] justify-center"
+      >
+        <Image
+          src="/dco-icon.webp"
+          alt="Design Co"
+          width={255}
+          height={255}
+          className="h-16 w-16 object-contain"
+          priority
+        />
       </a>
       <div className="hidden min-[744px]:flex items-center space-x-8 text-base font-display text-white">
         <a
