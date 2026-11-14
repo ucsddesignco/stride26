@@ -705,8 +705,18 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         if (moved && !ball.gone) placeBall({ x: ball.x, z: ball.z }, ball);
       }
     };
-    const resized = new ResizeObserver(onResize);
-    resized.observe(felt);
+    // The table is sized by CSS transforms, which a ResizeObserver doesn't see,
+    // and the camera follows the viewport width alone: so listen on the window,
+    // and re-measure once per frame however many resize events come in.
+    let resizeFrame: number | null = null;
+    const onWindowResize = () => {
+      if (resizeFrame !== null) return;
+      resizeFrame = requestAnimationFrame(() => {
+        resizeFrame = null;
+        onResize();
+      });
+    };
+    window.addEventListener("resize", onWindowResize);
 
     const advance = (roll: Roll, dt: number) => {
       roll.time += dt;
@@ -719,7 +729,9 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     // One loop for every rolling ball, running only while one is.
     const tick = (now: number) => {
-      const dt = Math.min((now - lastFrame) / 1000, 1 / 30) * speed();
+      // rAF's timestamp is the frame's start, which can be before the
+      // performance.now() a fresh loop starts from: never step backwards
+      const dt = clamp((now - lastFrame) / 1000, 0, 1 / 30) * speed();
       lastFrame = now;
       rolls.forEach((roll) => advance(roll, dt));
       raf = rolls.size > 0 ? requestAnimationFrame(tick) : null;
@@ -951,7 +963,11 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       await Promise.all([fadeBall(blue, 1, 0), fadeBall(white, 1, 0), fadeCue(1, 0)]);
       if (id !== shotId) return;
       putAway(blue);
-      placeBall(planShot(blue, FIRST_ENTRY, FIRST_CUT, GONE_SPEED).after.rest, white);
+      // set its position first, so placeBall doesn't roll it (and turn its face) across the jump
+      const firstRest = planShot(blue, FIRST_ENTRY, FIRST_CUT, GONE_SPEED).after.rest;
+      white.x = firstRest.x;
+      white.z = firstRest.z;
+      placeBall(firstRest, white);
       setBallOpacity(white, 0);
       aimCueFromLeft(SECOND_EXIT);
       await Promise.all([fadeBall(white, 0, 1), fadeCue(0, 1)]);
@@ -963,7 +979,10 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       await Promise.all([fadeBall(eight, 1, 0), fadeBall(white, 1, 0), fadeCue(1, 0)]);
       if (id !== shotId) return;
       putAway(eight);
-      placeBall(planShot(eight, SECOND_ENTRY, SECOND_CUT, EIGHT_GONE_SPEED, SECOND_CONTACT_SPEED).after.rest, white);
+      const secondRest = planShot(eight, SECOND_ENTRY, SECOND_CUT, EIGHT_GONE_SPEED, SECOND_CONTACT_SPEED).after.rest;
+      white.x = secondRest.x;
+      white.z = secondRest.z;
+      placeBall(secondRest, white);
       setBallOpacity(white, 0);
       await fadeBall(white, 0, 1);
       if (id === shotId) stage = "done";
@@ -1135,7 +1154,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
 
     return () => {
       offscreen.disconnect();
-      resized.disconnect();
+      window.removeEventListener("resize", onWindowResize);
+      if (resizeFrame !== null) cancelAnimationFrame(resizeFrame);
       root.removeEventListener("click", onTableClick);
       stopAll();
       unsubscribe.forEach((u) => u());
