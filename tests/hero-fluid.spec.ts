@@ -97,7 +97,7 @@ test("spotlight cone takes its shape for each width", async ({ page }) => {
       await page.setViewportSize({ width, height: 900 });
 
       const scales = await page.evaluate(() =>
-        Array.from(document.querySelectorAll(".table-cone-wing")).map(
+        Array.from(document.querySelectorAll(".table-cone .table-cone-wing")).map(
           (el) => new DOMMatrix(getComputedStyle(el).transform).a,
         ),
       );

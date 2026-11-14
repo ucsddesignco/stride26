@@ -141,6 +141,9 @@ body {
   --p: calc(var(--c) / 0.97347);
   /* undoes the felt's squash relative to the tablet angle (see shadows) */
   --unsquash: calc(0.2288 / var(--s));
+  /* the light cone's haze: fades out toward mobile (see .table-cone and
+     .table-ball-haze, which tints a ball's unlit side in front of it) */
+  --cone-opacity: calc(0.21 * max(0, 1 - 1.5 * var(--t)));
 
   /* table center and scale move from the desktop to the tablet to the mobile
      frame (--t and --u are never both non-zero, so their terms just add).
@@ -253,7 +256,7 @@ body {
 }
 
 .table-cone {
-  opacity: calc(0.21 * max(0, 1 - 1.5 * var(--t)));
+  opacity: var(--cone-opacity);
 }
 
 /* The desktop cone is wider than the tablet one where it meets the nav bar.
@@ -286,12 +289,21 @@ body {
   --edge-slope: 0.70845;
 }
 
-.table-plane {
+.table-plane,
+.table-on-screen {
   transform: scale(1, var(--s));
+}
+
+/* the white ball's front clip: .table-on-screen, moved down by its overhang
+   (world px, see PoolShot's placeBall) */
+.table-front-clip-white {
+  transform: translate(0, calc(var(--overhang, 0) * 1px)) scale(1, var(--s));
 }
 
 /* Ball radius eases from its tablet size to its top-down size */
 .table-ball,
+.table-ball-felt,
+.table-ball-haze,
 .table-ball-shadow,
 .table-hint,
 .table-cue,
@@ -300,9 +312,16 @@ body {
 }
 
 /* PoolShot moves the balls (and their shadows) from JS: --bx/--bz offset them
-   on the felt (world px), --bs scales them, --spin turns the face (deg) and
-   --sq squashes them on impact (0 → 1). */
-.table-ball {
+   on the felt (world px), --bs scales them and --spin turns the white ball's
+   face (deg). The blue and eight balls roll for real instead: PoolShot
+   redraws their spot's outline on the sphere (see BallSpot).
+   Balls never change shape: billiard balls are rigid. Their side out of the
+   lamp's light is a path PoolShot redraws as they move (.table-ball-dark),
+   drawn again in the cone's haze by a twin that follows the same variables
+   (.table-ball-haze), clipped to the cone's shape on screen. */
+.table-ball,
+.table-ball-felt,
+.table-ball-haze {
   transform: translate(
       calc((var(--x) + var(--bx, 0)) * 1px),
       calc(((var(--z) + var(--bz, 0)) * var(--s) - var(--r) * var(--c)) * 1px)
@@ -311,8 +330,27 @@ body {
 }
 
 .table-ball-spin {
-  transform: scale(calc(1 - 0.07 * var(--sq, 0)), calc(1 + 0.04 * var(--sq, 0)))
-    rotate(calc(var(--spin, 0) * 1deg));
+  transform: rotate(calc(var(--spin, 0) * 1deg));
+}
+
+.table-ball-dark {
+  pointer-events: none;
+}
+
+/* the cone's haze over black, as the cone itself is drawn: opaque shapes in a
+   layer at the cone's opacity (reduced motion fades .table-ball-haze inside it) */
+.table-ball-haze-layer {
+  opacity: var(--cone-opacity);
+}
+
+.table-ball-felt,
+.table-ball-haze {
+  pointer-events: none;
+}
+
+/* the whole ball, hazed as it goes behind the cone past the back rim */
+.table-ball-behind {
+  fill-opacity: var(--behind, 0);
 }
 
 /* "Click me" beside the smiley (see TableScene.tsx, Figma 9346:258). Its origin
@@ -361,11 +399,16 @@ body {
    stays within the ball's height.
    Figma: per ball, --sx/--sz and --sa…--sd (see TableScene). Their depth
    terms are scaled by --unsquash so they keep their on-screen size as the
-   camera tilts up, instead of ballooning once the felt stops being squashed. */
+   camera tilts up, instead of ballooning once the felt stops being squashed.
+   The offset is scaled by --bs like the shape, so as a ball moves back the
+   shadow shrinks with it and keeps the same gap, moving rigidly with the
+   ball. --lit fades the shadow as the ball leaves the light (reduced
+   motion's inline opacity overrides it). */
 .table-ball-shadow {
+  opacity: var(--lit, 1);
   transform: translate(
-      calc((var(--x) + var(--bx, 0) + var(--r) * (0.25 + (var(--sx) - 0.25) * var(--p))) * 1px),
-      calc((var(--z) + var(--bz, 0) + var(--r) * var(--sz) * var(--unsquash) * var(--p)) * 1px)
+      calc((var(--x) + var(--bx, 0) + var(--r) * (0.25 + (var(--sx) - 0.25) * var(--p)) * var(--bs, 1)) * 1px),
+      calc((var(--z) + var(--bz, 0) + var(--r) * var(--sz) * var(--unsquash) * var(--p) * var(--bs, 1)) * 1px)
     )
     matrix(
       calc(var(--r) * (1.0308 + (var(--sa) - 1.0308) * var(--p))),

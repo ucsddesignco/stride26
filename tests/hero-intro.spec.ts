@@ -154,6 +154,37 @@ test("the table reset flickers like the intro, from dark", async ({ page }) => {
   expectFlicker(samples.slice(samples.findIndex((s) => s.light < 0.1)));
 });
 
+// Billiard balls are rigid: the ball faces only ever rotate, on both shots,
+// with no squash at the cue strike or at contact.
+test("the balls keep their shape through both shots", async ({ page }) => {
+  await page.addInitScript(() => {
+    const w = window as unknown as HeroWindow & { ballShapes: number[] };
+    w.__poolShotSpeed = 4;
+    w.ballShapes = [];
+    const tick = () => {
+      for (const el of document.querySelectorAll(".table-ball-spin")) {
+        const m = new DOMMatrix(getComputedStyle(el).transform);
+        // a pure rotation has a == d, b == -c and a² + b² == 1
+        w.ballShapes.push(Math.abs(m.a - m.d), Math.abs(m.b + m.c), Math.abs(m.a * m.a + m.b * m.b - 1));
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+  await page.goto("/");
+  await page.locator("[data-hero-ready]").waitFor();
+
+  const cue = page.locator("[data-pool-cue]");
+  await expect(async () => {
+    if ((await cue.getAttribute("aria-label")) !== "Reset the table") await cue.press("Enter");
+    await expect(cue).toHaveAttribute("aria-label", "Reset the table", { timeout: 250 });
+  }).toPass({ timeout: 20_000 });
+
+  const shapes = await page.evaluate(() => (window as unknown as { ballShapes: number[] }).ballShapes);
+  expect(shapes.length).toBeGreaterThan(0);
+  expect(shapes.reduce((a, b) => Math.max(a, b), 0)).toBeLessThan(1e-3);
+});
+
 // The dot over the i glows with the title. It starts with a transparent glow
 // rather than no filter, which framer-motion can't animate from: it used to
 // log "Invalid keyframe value for property filter" on every load.
