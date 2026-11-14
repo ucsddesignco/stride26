@@ -250,6 +250,12 @@ export default function TableScene() {
           <clipPath id="table-front-clip">
             <path className="table-on-screen" d={FRONT_CLIP} />
           </clipPath>
+          {/* the white ball's own copy, moved down by how far its drawn bottom
+              hangs below where it touches the felt (PoolShot writes
+              --overhang), so it goes behind the rim once that touch point does */}
+          <clipPath id="table-front-clip-white">
+            <path data-front-clip-white className="table-front-clip-white" d={FRONT_CLIP} />
+          </clipPath>
           {/* the cone's screen shape, moved by the same CSS as the haze below */}
           <clipPath id="table-cone-clip">
             <polygon points={CONE_POLYGON} />
@@ -310,7 +316,15 @@ export default function TableScene() {
             )}
             {/* cut at the front rim on screen: a ball crossing it isn't lit by
                 the lamp, so it slides behind the rim instead */}
-            <g clipPath={ball.kind !== "yellow" ? "url(#table-front-clip)" : undefined}>
+            <g
+              clipPath={
+                ball === cueBall
+                  ? "url(#table-front-clip-white)"
+                  : ball.kind !== "yellow"
+                    ? "url(#table-front-clip)"
+                    : undefined
+              }
+            >
               <g
                 aria-hidden
                 data-ball={ball.kind}

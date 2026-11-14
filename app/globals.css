@@ -294,6 +294,12 @@ body {
   transform: scale(1, var(--s));
 }
 
+/* the white ball's front clip: .table-on-screen, moved down by its overhang
+   (world px, see PoolShot's placeBall) */
+.table-front-clip-white {
+  transform: translate(0, calc(var(--overhang, 0) * 1px)) scale(1, var(--s));
+}
+
 /* Ball radius eases from its tablet size to its top-down size */
 .table-ball,
 .table-ball-felt,

@@ -439,6 +439,8 @@ export default function PoolShot({ children }: { children: ReactNode }) {
     const eight = makeBall(eightBall);
     if (!white || !blue || !eight) return;
     const movingBalls = [white, blue, eight];
+    // the white ball's own front clip (see placeBall)
+    const whiteClip = root.querySelector<SVGElement>("[data-front-clip-white]");
     // "Click me": gone for good once the first shot is taken
     const hint = root.querySelector<SVGElement>("[data-pool-hint]");
 
@@ -631,6 +633,12 @@ export default function PoolShot({ children }: { children: ReactNode }) {
       setBall(ball, "--bx", x - ball.spec.x);
       setBall(ball, "--bz", z - ball.spec.z);
       setBall(ball, "--bs", radius / baseRadius(ball.spec));
+      if (ball === white && whiteClip) {
+        // Its drawn bottom is radius below its center on screen, and the center
+        // sits --r·c above where it touches the felt (see .table-ball).
+        const c = Math.sqrt(Math.max(0, 1 - view.squash * view.squash));
+        whiteClip.style.setProperty("--overhang", String(radius - baseRadius(ball.spec) * c));
+      }
       drawLight(ball, radius);
     };
 
@@ -952,6 +960,7 @@ export default function PoolShot({ children }: { children: ReactNode }) {
         }
       });
       cueParts.forEach((el) => CUE_VARS.forEach((name) => el.style.removeProperty(name)));
+      whiteClip?.style.removeProperty("--overhang");
       setFinished(false);
     };
 
